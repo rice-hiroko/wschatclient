@@ -31,7 +31,7 @@ chat.onOpen = function(){
     room.onMessage = function(msgobj) {
 
       // Запись значения цвета никнейма отправителя в переменную
-      var senderColor = 'msgobj.color';
+      var senderColor = msgobj.color
 
       // Замена цвета никнейма, если тот имеет цвет gray (т.е. не HEX)
       if (msgobj.color == 'gray') {
