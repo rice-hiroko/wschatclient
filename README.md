@@ -6,7 +6,9 @@
 
 `git clone https://github.com/hypersad/wsChatClient`
 
-Установка:
+`cd wsChatClient`
+
+Установка зависимостей:
 
 `npm install`
 
