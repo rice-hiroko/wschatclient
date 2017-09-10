@@ -1,5 +1,3 @@
-// TODO: Сделать возможность так или иначе узнавать список пользователей онлайн
-
 // Подключение требуемых модулей
 const wsChat = require('wschatapi');
 const chalk = require('chalk');
@@ -24,7 +22,7 @@ let chat = new wsChat('wss://sinair.ru/ws/chat');
 chat.onOpen = function(){
 
   // Подключение к комнате
-  chat.joinRoom('#iAir', (success, room) =>{
+  chat.joinRoom('#chat', (success, room) =>{
 
     // Предварительная очистка окна терминала
     console.clear()
