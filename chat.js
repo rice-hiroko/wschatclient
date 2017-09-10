@@ -66,6 +66,11 @@ chat.onOpen = function(){
       else if (msgobj.to != 0) {
         var toName = room.getMemberById(msgobj.to).name
         var toColor = room.getMemberById(msgobj.to).color
+
+        if (toColor == 'gray') {
+          var toColor = '#808080'
+        }
+        
         console.log(hint('(лс) ') + chalk.bold.hex(senderColor)(msgobj.from_login) + hint(' > ') + chalk.hex(toColor).bold(toName) + ": " + msg(msgobj.message))
       }
     };
