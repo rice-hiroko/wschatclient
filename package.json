@@ -6,7 +6,11 @@
   "author": "helix",
   "license": "ISC",
   "scripts": {
-    "start": "node chat.js",
+    "start": "node chat.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hypersad/wsChatClient.git"
   },
   "dependencies": {
     "chalk": "^2.1.0",
