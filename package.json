@@ -1,7 +1,7 @@
 {
   "name": "wschatclient",
-  "version": "0.0.1",
-  "description": "sinair.ru chat in a terminal window!",
+  "version": "0.0.2",
+  "description": "Простой клиент чата на веб-сокетах в терминале",
   "main": "chat.js",
   "author": "helix",
   "license": "ISC",
@@ -13,8 +13,8 @@
     "url": "git+https://github.com/hypersad/wsChatClient.git"
   },
   "dependencies": {
+    "blessed": "^0.1.81",
     "chalk": "^2.1.0",
-    "readline": "^1.3.0",
     "wschatapi": "git+https://github.com/iassasin/wschatapi.git"
   }
 }
