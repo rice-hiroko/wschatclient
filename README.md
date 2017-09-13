@@ -5,7 +5,7 @@
 Загрузка:
 
 ```
-git clone https://github.com/hypersad/wsChatClient`
+git clone https://github.com/hypersad/wsChatClient
 cd wsChatClient
 ```
 
