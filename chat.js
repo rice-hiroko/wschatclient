@@ -37,7 +37,7 @@ inputField.focus();
 let chat = new wschat('wss://sinair.ru/ws/chat');
 
 chat.onOpen = function() {
-  chat.joinRoom('#wschatclient-dev', (success, room) =>{
+  chat.joinRoom('#chat', (success, room) =>{
 
     updateOnlineList()
 
