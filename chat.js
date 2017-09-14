@@ -24,9 +24,9 @@ window.append(chatBox);
 window.append(onlineBox);
 window.append(inputBox);
 
-window.title = 'wsChatClient'
+window.title = 'wsChatClient';
 
-function log(text) { chatField.pushLine(text); window.render() }
+function log(text) { chatField.pushLine(text); window.render() };
 
 inputField.key(['C-c'], () => process.exit(0));
 
@@ -37,35 +37,34 @@ inputField.focus();
 let chat = new wschat('wss://sinair.ru/ws/chat');
 
 chat.onOpen = function() {
-  chat.joinRoom('#chat', (success, room) =>{
+  chat.joinRoom('#wschatclient-dev', (success, room) =>{
 
-    updateOnlineList()
+    updateOnlineList();
 
-    // В данный момент в списке отображаешься только одна комната - активная
     roomsField.insertItem(0, chalk.bold.inverse.white(room.getTarget()));
-    window.title = 'wsChatClient - ' + room.getTarget()
+    window.title = 'wsChatClient - ' + room.getTarget();
 
     room.onMessage = function(msgobj) {
-      var senderColor = msgobj.color
+      var senderColor = msgobj.color;
 
       if (msgobj.color == 'gray') { var senderColor = '#808080' };
 
       if (msgobj.style == 0 && msgobj.to == 0) {
-        var message = chalk.bold.hex(senderColor)(msgobj.from_login, ': ') + text(msgobj.message)
-        var fMessage = message.replace(' :', ':')
+        var message = chalk.bold.hex(senderColor)(msgobj.from_login, ': ') + text(msgobj.message);
+        var fMessage = message.replace(' :', ':');
 
-        log(fMessage)
+        log(fMessage);
       }
 
-      else if (msgobj.style == 1) { log(hint('* ') + chalk.bold.hex(senderColor)(msgobj.from_login, '') + text(msgobj.message)) }
+      else if (msgobj.style == 1) { log(hint('* ') + chalk.bold.hex(senderColor)(msgobj.from_login, '') + text(msgobj.message)); }
 
-      else if (msgobj.style == 2) { log(hint("* ") + text(msgobj.message)) }
+      else if (msgobj.style == 2) { log(hint("* ") + text(msgobj.message)); }
 
       else if (msgobj.style == 3) {
-        var message = chalk.bold.hex(senderColor)(msgobj.from_login, ': ') + hint('(( ') + chalk.hex('#808080')(msgobj.message) + hint(' ))')
-        var fMessage = message.replace(' :', ':')
+        var message = chalk.bold.hex(senderColor)(msgobj.from_login, ': ') + hint('(( ') + chalk.hex('#808080')(msgobj.message) + hint(' ))');
+        var fMessage = message.replace(' :', ':');
 
-        log(fMessage)
+        log(fMessage);
       }
 
       else if (msgobj.to != 0) {
@@ -74,7 +73,7 @@ chat.onOpen = function() {
 
         if (toColor == 'gray') { var toColor = '#808080' };
 
-        log(hint('(лс) ') + chalk.bold.hex(senderColor)(msgobj.from_login) + hint(' > ') + chalk.hex(toColor).bold(toName) + ": " + text(msgobj.message))
+        log(hint('(лс) ') + chalk.bold.hex(senderColor)(msgobj.from_login) + hint(' > ') + chalk.hex(toColor).bold(toName + ': ') + text(msgobj.message));
       };
     };
 
@@ -95,12 +94,15 @@ chat.onOpen = function() {
       if (user.status == 6) { log(data(user.name) + evnt(' сменил ') + chalk.hex(user.color).bold('цвет')) };
       if (user.status == 5) {
         if (user.girl == false) { log(data(user.name) + evnt(' сменила пол на ') + data('мужской')) }
-        else if (user.girl == true) { log(data(user.name) + evnt(' сменил пол на ') + data('женский')) }
+        else if (user.girl == true) { log(data(user.name) + evnt(' сменил пол на ') + data('женский')) };
       };
       updateOnlineList();
     };
 
     room.onSysMessage = function(message) { log(evnt(message)) };
+
+    room.onJoined = function() { updateOnlineList(); };
+    room.onLeave = function() { updateOnlineList(); };
 
     function updateOnlineList() {
       onlineField.clearItems();
@@ -108,12 +110,19 @@ chat.onOpen = function() {
 
       for (var i in members) {
         var obj = members[i];
-        var memberColor = obj.color
+        var memberColor = obj.color;
 
-        if (obj.color == 'gray') { var memberColor = '#808080' }
-        var member = chalk.bold.hex(memberColor)(obj.name);
+        if (obj.color == 'gray') { var memberColor = '#808080'; };
 
+        if (obj.status == 2) {
+          var member = chalk.bold.yellow('* ') + chalk.bold.hex(memberColor)(obj.name);
+          onlineField.insertItem(0, member);
+        }
+
+        else if (obj.status == 3) {
+        var member = hint('* ') + chalk.bold.hex(memberColor)(obj.name);
         onlineField.insertItem(0, member);
+        };
       };
     };
 
