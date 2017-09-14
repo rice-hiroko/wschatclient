@@ -11,7 +11,7 @@ const window = blessed.screen({ smartCSR: true });
 
 const roomsBox = blessed.box({ label: 'Комнаты', width: '100%', height: 3, border: { type: 'line' } });
 const chatBox = blessed.box({ label: 'Чат', width: '100%-24', height: '100%-6', top: 3, right: 24, border: { type: 'line' } });
-const onlineBox = blessed.box({ label: 'В комнате', width: 24, height: '100%-6', right: 0, top: 3, bottom: 3, border: { type: 'line' } });
+const onlineBox = blessed.box({ label: 'В комнате', width: 24, height: '100%-6', top: 3, bottom: 3, right: 0, border: { type: 'line' } });
 const inputBox = blessed.box({ label: 'Введите сообщение', width: '100%', height: 3, bottom: 0, border: { type: 'line' } });
 
 const roomsField = blessed.list({ parent: roomsBox, interactive: false, padding: { left: 1, right: 1 } });
@@ -124,6 +124,7 @@ chat.onOpen = function() {
         onlineField.insertItem(0, member);
         };
       };
+      window.render();
     };
 
     inputField.key('enter', () => {
