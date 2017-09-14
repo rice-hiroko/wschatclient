@@ -37,7 +37,7 @@ inputField.focus();
 let chat = new wschat('wss://sinair.ru/ws/chat');
 
 chat.onOpen = function() {
-  chat.joinRoom('#wschatclient-dev', (success, room) =>{
+  chat.joinRoom('#chat', (success, room) =>{
 
     updateOnlineList();
 
@@ -115,7 +115,7 @@ chat.onOpen = function() {
         if (obj.color == 'gray') { var memberColor = '#808080'; };
 
         if (obj.status == 2) {
-          var member = chalk.bold.yellow('* ') + chalk.bold.hex(memberColor)(obj.name);
+          var member = evnt('* ') + chalk.bold.hex(memberColor)(obj.name);
           onlineField.insertItem(0, member);
         }
 
