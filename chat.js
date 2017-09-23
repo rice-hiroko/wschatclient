@@ -3,21 +3,21 @@ const chalk = require('chalk');
 const blessed = require('blessed');
 
 const config = require('./config');
+const userAPIKey = config.userAPIKey;
+const borderColor = config.bordersColor;
+const roomToJoin = config.roomToJoin;
 
 const text = chalk.white;
-const event = chalk.bold.hex('#FFD700');
 const hint = chalk.bold.hex('#808080');
 const data = chalk.bold.hex('#87CEEB');
+const event = chalk.bold.hex('#FFD700');
 
 const window = blessed.screen({ smartCSR: true });
-
-const userAPIKey = config.userAPIKey
-const borderColor = config.bordersColor
 
 const roomsBox = blessed.box({ label: 'Комнаты', width: '100%', height: 3, border: { type: 'line', fg: borderColor }, style: { label: { fg: borderColor } } });
 const chatBox = blessed.box({ label: 'Чат', width: '100%-24', height: '100%-6', top: 3, right: 24, border: { type: 'line', fg: borderColor }, style: { label: { fg: borderColor } } });
 const onlineBox = blessed.box({ label: 'В комнате', width: 24, height: '100%-6', top: 3, bottom: 3, right: 0, border: { type: 'line', fg: borderColor }, style: { label: { fg: borderColor } } });
-const inputBox = blessed.box({ label: 'Введите сообщение:', width: '100%', height: 3, bottom: 0, border: { type: 'line', fg: borderColor }, style: { label: { fg: borderColor } } });
+const inputBox = blessed.box({ label: 'Ваше сообщение', width: '100%', height: 3, bottom: 0, border: { type: 'line', fg: borderColor }, style: { label: { fg: borderColor } } });
 
 const roomsField = blessed.list({ parent: roomsBox, interactive: false, padding: { left: 1, right: 1 } });
 const chatField = blessed.log({ parent: chatBox, scrollable: true, mouse: true, padding: { left: 1, right: 1 } });
@@ -46,7 +46,7 @@ chat.open();
 chat.onOpen = function() {
   if ( userAPIKey != '' ) { chat.authByApiKey(userAPIKey, (success, userinfo) => {}); };
 
-  chat.joinRoom({ target: '#chat', callback: function(success, room){
+  chat.joinRoom({ target: roomToJoin, callback: function(success, room){
 
     updateOnlineList();
 
