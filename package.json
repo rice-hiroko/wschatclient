@@ -1,6 +1,6 @@
 {
   "name": "wschatclient",
-  "version": "0.0.2",
+  "version": "0.0.8",
   "description": "Простой клиент чата на веб-сокетах в терминале",
   "main": "chat.js",
   "author": "helix",
