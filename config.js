@@ -1,5 +1,5 @@
 module.exports = {
-  userAPIKey: '',
-  roomToJoin: '#chat',
+  APIKey: '',
+  roomToJoin: '',
   bordersColor: ''
 };
