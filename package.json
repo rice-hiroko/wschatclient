@@ -1,7 +1,7 @@
 {
   "name": "wschatclient",
-  "version": "0.0.9",
-  "description": "Простой клиент чата в терминале.",
+  "version": "0.1.0",
+  "description": "Простой клиент чата в терминале",
   "main": "chat.js",
   "author": "hypersad",
   "license": "ISC",
@@ -10,7 +10,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hypersad/wsChatClient.git"
+    "url": "git+https://github.com/hypersad/wsсhatсlient.git"
   },
   "dependencies": {
     "blessed": "^0.1.81",
