@@ -1,26 +1,28 @@
+'use strict';
+
 const wschat = require('wschatapi');
 const chalk = require('chalk');
 const blessed = require('blessed');
 
 const config = require('./config');
-const userAPIKey = config.userAPIKey;
-const borderColor = config.bordersColor;
-const roomToJoin = config.roomToJoin;
+const bordersColor = config.bordersColor;
 
 const text = chalk.white;
 const hint = chalk.bold.hex('#808080');
 const data = chalk.bold.hex('#87CEEB');
 const event = chalk.bold.hex('#FFD700');
+const error = chalk.bold.hex('#FF5555');
 
 const window = blessed.screen({ smartCSR: true });
 
-const roomsBox = blessed.box({ label: 'Комнаты', width: '100%', height: 3, border: { type: 'line', fg: borderColor }, style: { label: { fg: borderColor } } });
-const chatBox = blessed.box({ label: 'Чат', width: '100%-24', height: '100%-6', top: 3, right: 24, border: { type: 'line', fg: borderColor }, style: { label: { fg: borderColor } } });
-const onlineBox = blessed.box({ label: 'В комнате', width: 24, height: '100%-6', top: 3, bottom: 3, right: 0, border: { type: 'line', fg: borderColor }, style: { label: { fg: borderColor } } });
-const inputBox = blessed.box({ label: 'Ваше сообщение', width: '100%', height: 3, bottom: 0, border: { type: 'line', fg: borderColor }, style: { label: { fg: borderColor } } });
+const roomsBox = blessed.box({ label: 'Комнаты', width: '100%', height: 3, border: { type: 'line', fg: bordersColor }, style: { label: { fg: bordersColor } } });
+const chatBox = blessed.box({ label: 'Чат', width: '100%-24', height: '100%-6', top: 3, right: 24, border: { type: 'line', fg: bordersColor }, style: { label: { fg: bordersColor } } });
+const onlineBox = blessed.box({ label: 'В комнате', width: 24, height: '100%-6', top: 3, bottom: 3, right: 0, border: { type: 'line', fg: bordersColor }, style: { label: { fg: bordersColor } } });
+const inputBox = blessed.box({ label: 'Ваше сообщение:', width: '100%', height: 3, bottom: 0, border: { type: 'line', fg: bordersColor }, style: { label: { fg: bordersColor } } });
 
-const roomsField = blessed.list({ parent: roomsBox, interactive: false, padding: { left: 1, right: 1 } });
-const chatField = blessed.log({ parent: chatBox, scrollable: true, mouse: true, padding: { left: 1, right: 1 } });
+const roomsField = blessed.box({ parent: roomsBox, padding: { left: 1, right: 1 } });
+const chatField = blessed.log({ parent: chatBox, scrollable: true, mouse: true, height: '100%-3', top: 0, padding: { left: 1, right: 1 } });
+const typingField = blessed.box({ parent: chatBox, height: 1, bottom: 0, padding: { left: 1, right: 1} })
 const onlineField = blessed.list({ parent: onlineBox, interactive: false, padding: { left: 1, right: 1 } });
 const inputField = blessed.textarea({ parent: inputBox, inputOnFocus: true, padding: { left: 1, right: 1 } });
 
@@ -39,108 +41,84 @@ window.render();
 
 inputField.focus();
 
-let chat = new wschat('wss://sinair.ru/ws/chat');
+const chat = new wschat('wss://sinair.ru/ws/chat');
 
 chat.open();
 
 chat.onOpen = function() {
-  if ( userAPIKey != '' ) { chat.authByApiKey(userAPIKey, (success, userinfo) => {}); };
+  if ( config.APIKey != '' ) { chat.authByApiKey(config.APIKey, (success, userinfo) => {}); };
 
-  chat.joinRoom({ target: roomToJoin, callback: function(success, room){
+  chat.joinRoom({ target: (config.roomToJoin == '' ? '#chat' : config.roomToJoin), callback: function(success, room) {
+    if (success == true) {
+      window.title = 'wsChatClient - ' + room.getTarget();
+      roomsField.setContent(chalk.bold.inverse.white(room.getTarget()));
 
-    updateOnlineList();
-
-    roomsField.insertItem(0, chalk.bold.inverse.white(room.getTarget()));
-    window.title = 'wsChatClient - ' + room.getTarget();
-
-    room.onMessage = function(msgobj) {
-      var senderColor = msgobj.color;
-
-      if (msgobj.color == 'gray') { var senderColor = '#808080' };
-
-      if (msgobj.style == 0 && msgobj.to == 0) {
-        var message = chalk.bold.hex(senderColor)(msgobj.from_login, ': ') + text(msgobj.message);
-        var fMessage = message.replace(' :', ':');
-
-        log(fMessage);
-      }
-
-      else if (msgobj.style == 1) { log(hint('* ') + chalk.bold.hex(senderColor)(msgobj.from_login, '') + text(msgobj.message)); }
-
-      else if (msgobj.style == 2) { log(hint("* ") + text(msgobj.message)); }
-
-      else if (msgobj.style == 3) {
-        var message = chalk.bold.hex(senderColor)(msgobj.from_login, ': ') + hint('(( ') + chalk.hex('#808080')(msgobj.message) + hint(' ))');
-        var fMessage = message.replace(' :', ':');
-
-        log(fMessage);
-      }
-
-      else if (msgobj.to != 0) {
-        var toName = room.getMemberById(msgobj.to).name;
-        var toColor = room.getMemberById(msgobj.to).color;
-
-        if (toColor == 'gray') { var toColor = '#808080' };
-
-        log(hint('(лс) ') + chalk.bold.hex(senderColor)(msgobj.from_login) + hint(' > ') + chalk.hex(toColor).bold(toName + ': ') + text(msgobj.message));
-      };
-    };
-
-    room.onUserConnected = function(user) {
-      if (user.girl == false) { log(data(user.name) + event(' подключился к комнате')) }
-      else if (user.girl == true) { log(data(user.name) + event(' подключилась к комнате')) };
       updateOnlineList();
-    };
 
-    room.onUserDisconnected = function(user) {
-      if (user.girl == false) { log(data(user.name) + event(' отключился от комнаты')) }
-      else if (user.girl == true) { log(data(user.name) + event(' отключилась от комнаты')) };
-      updateOnlineList();
-    };
+      room.onMessage = function(msgobj) {
+        var senderColor = msgobj.color;
+        if (msgobj.color == 'gray') { var senderColor = '#808080' };
 
-    room.onUserStatusChanged = function(user) {
-      if (user.status == 4) { log(data(user.data) + event(' сменил никнейм на ') + data(user.name)) };
-      if (user.status == 6) { log(data(user.name) + event(' сменил ') + chalk.hex(user.color).bold('цвет')) };
-      if (user.status == 5) {
-        if (user.girl == false) { log(data(user.name) + event(' сменила пол на ') + data('мужской')) }
-        else if (user.girl == true) { log(data(user.name) + event(' сменил пол на ') + data('женский')) };
-      };
-      updateOnlineList();
-    };
+        if (msgobj.style == 0 && msgobj.to == 0) { log((chalk.bold.hex(senderColor)(msgobj.from_login, ': ') + text(msgobj.message)).replace(' :', ':')); }
+        else if (msgobj.style == 1) { log(hint('* ') + chalk.bold.hex(senderColor)(msgobj.from_login, '') + text(msgobj.message)); }
+        else if (msgobj.style == 2) { log(hint("* ") + text(msgobj.message)); }
+        else if (msgobj.style == 3) { log((chalk.bold.hex(senderColor)(msgobj.from_login, ': ') + hint('(( ') + chalk.hex('#808080')(msgobj.message) + hint(' ))')).replace(' :', ':')); }
+        else if (msgobj.to != 0) {
+          var toColor = room.getMemberById(msgobj.to).color;
+          if (toColor == 'gray') { var toColor = '#808080' };
 
-    room.onSysMessage = function(message) { log(event(message)) };
-
-    room.onJoined = function() { updateOnlineList(); };
-    room.onLeave = function() { updateOnlineList(); };
-
-    function updateOnlineList() {
-      onlineField.clearItems();
-      var members = room.getMembers();
-
-      for (var i in members) {
-        var obj = members[i];
-        var memberColor = obj.color;
-
-        if (obj.color == 'gray') { var memberColor = '#808080'; };
-
-        if (obj.status == 2) {
-          var member = event('* ') + chalk.bold.hex(memberColor)(obj.name);
-          onlineField.insertItem(0, member);
-        }
-
-        else if (obj.status == 3) {
-        var member = hint('* ') + chalk.bold.hex(memberColor)(obj.name);
-        onlineField.insertItem(0, member);
+          log(hint('(лс) ') + chalk.bold.hex(senderColor)(msgobj.from_login) + hint(' > ') + chalk.hex(toColor).bold(room.getMemberById(msgobj.to).name + ': ') + text(msgobj.message));
         };
       };
-      window.render();
-    };
 
-    inputField.key('enter', () => {
-      var message = inputField.getValue();
-      var fMessage = message.replace('\n', '');
-      room.sendMessage(fMessage);
-      inputField.clearValue();
-    });
-  }, autoLogin: true, loadHistory: true });
+      room.onUserConnected = function(userobj) { userobj.girl ? log(data(userobj.name) + event(' подключилась к комнате')) : log(data(userobj.name) + event(' подключился к комнате')); updateOnlineList(); };
+      room.onUserDisconnected = function(userobj) { userobj.girl ? log(data(userobj.name) + event(' отключилась от комнаты')) : log(data(userobj.name) + event(' отключился от комнаты')); updateOnlineList(); };
+
+      room.onUserStatusChanged = function(userobj) {
+        if (userobj.status == 4) { userobj.girl ? log(data(userobj.data) + event(' сменила никнейм на ') + data(userobj.name)) : log(data(userobj.data) + event(' сменил никнейм на ') + data(userobj.name)); };
+        if (userobj.status == 6) { userobj.girl ? log(data(userobj.name) + event(' сменила ') + chalk.hex(userobj.color).bold('цвет')) : log(data(userobj.name) + event(' сменил ') + chalk.hex(userobj.color).bold('цвет')); };
+        if (userobj.status == 5) { userobj.girl ? log(data(userobj.name) + event(' сменил пол на ') + data('женский')) : log(data(userobj.name) + event(' сменила пол на ') + data('мужской')); };
+        if (userobj.status == 8 || userobj.status == 9) { updateTypingList() };
+        updateOnlineList();
+      };
+
+      room.onSysMessage = function(msg) { log(event(msg)) };
+
+      room.onJoined = function() { updateOnlineList(); };
+      room.onLeave = function() { updateOnlineList(); };
+
+      function updateOnlineList() {
+        onlineField.clearItems();
+        var members = room.getMembers();
+
+        for (var i in members) {
+          var obj = members[i];
+          var memberColor = obj.color;
+          if (obj.color == 'gray') { var memberColor = '#808080'; };
+
+          if (obj.status == 2) { onlineField.insertItem(0, (event('* ') + chalk.bold.hex(memberColor)(obj.name))) }
+          else if (obj.status == 3) { onlineField.insertItem(0, (hint('* ') + chalk.bold.hex(memberColor)(obj.name))) };
+        };
+        window.render();
+      };
+
+      function updateTypingList() {
+        var members = room.getMembers();
+        var typingMembers = [];
+
+        for (var i in members) {
+          var obj = members[i];
+          if (obj.typing == true) { typingMembers.push(members[i]) };
+        };
+
+        typingMembers.length > 0 ? typingField.setContent(hint(typingMembers[0].name) + hint(typingMembers.length < 2 ? ' печатает...' : ' и другие печатают...')) : typingField.setContent('')
+
+        window.render();
+      };
+
+      inputField.key('enter', () => { room.sendMessage((inputField.getValue()).replace('\n', '')); inputField.clearValue(); });
+    } else {
+    if (room.code == 3) { log(error('Комнаты ' + room.target + ' не существует.')) }
+    else { log(error('Необработанная ошибка:') + '\n\n' + error(JSON.stringify(room)) + '\n\n' + error('Пожалуйста, сохраните содержимое ошибки выше и создайте задачу по её исправлению на https://github.com/hypersad/wschatclient.'))}
+  }}, autoLogin: true, loadHistory: true });
 };
