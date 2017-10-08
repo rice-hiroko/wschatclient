@@ -1,6 +1,6 @@
 {
   "name": "wschatclient",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Простой клиент чата в терминале",
   "main": "chat.js",
   "author": "hypersad",
