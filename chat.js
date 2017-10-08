@@ -13,12 +13,12 @@ const data = chalk.bold.hex('#87CEEB');
 const event = chalk.bold.hex('#FFD700');
 const error = chalk.bold.hex('#FF5555');
 
-const window = blessed.screen({ smartCSR: true });
+const window = blessed.screen({ smartCSR: true, sendFocus: true });
 
 const roomsBox = blessed.box({ label: 'Комнаты', width: '100%', height: 3, border: { type: 'line', fg: bordersColor }, style: { label: { fg: bordersColor } } });
 const chatBox = blessed.box({ label: 'Чат', width: '100%-24', height: '100%-6', top: 3, right: 24, border: { type: 'line', fg: bordersColor }, style: { label: { fg: bordersColor } } });
 const onlineBox = blessed.box({ label: 'В комнате', width: 24, height: '100%-6', top: 3, bottom: 3, right: 0, border: { type: 'line', fg: bordersColor }, style: { label: { fg: bordersColor } } });
-const inputBox = blessed.box({ label: 'Ваше сообщение:', width: '100%', height: 3, bottom: 0, border: { type: 'line', fg: bordersColor }, style: { label: { fg: bordersColor } } });
+const inputBox = blessed.box({ label: 'Введите сообщение:', width: '100%', height: 3, bottom: 0, border: { type: 'line', fg: bordersColor }, style: { label: { fg: bordersColor } } });
 
 const roomsField = blessed.box({ parent: roomsBox, padding: { left: 1, right: 1 } });
 const chatField = blessed.log({ parent: chatBox, scrollable: true, mouse: true, height: '100%-3', top: 0, padding: { left: 1, right: 1 } });
@@ -36,6 +36,7 @@ window.title = 'wsChatClient';
 function log(text) { chatField.pushLine(text); window.render() };
 
 inputField.key(['C-c'], () => process.exit(0));
+inputField.key(['C-r'], () => { inputField.clearValue(); window.render() });
 
 window.render();
 
@@ -49,10 +50,9 @@ chat.onOpen = function() {
   if ( config.APIKey != '' ) { chat.authByApiKey(config.APIKey, (success, userinfo) => {}); };
 
   chat.joinRoom({ target: (config.roomToJoin == '' ? '#chat' : config.roomToJoin), callback: function(success, room) {
-    if (success == true) {
+    if (success) {
       window.title = 'wsChatClient - ' + room.getTarget();
       roomsField.setContent(chalk.bold.inverse.white(room.getTarget()));
-
       updateOnlineList();
 
       room.onMessage = function(msgobj) {
@@ -61,7 +61,7 @@ chat.onOpen = function() {
 
         if (msgobj.style == 0 && msgobj.to == 0) { log((chalk.bold.hex(senderColor)(msgobj.from_login, ': ') + text(msgobj.message)).replace(' :', ':')); }
         else if (msgobj.style == 1) { log(hint('* ') + chalk.bold.hex(senderColor)(msgobj.from_login, '') + text(msgobj.message)); }
-        else if (msgobj.style == 2) { log(hint("* ") + text(msgobj.message)); }
+        else if (msgobj.style == 2) { log(hint('* ') + text(msgobj.message)); }
         else if (msgobj.style == 3) { log((chalk.bold.hex(senderColor)(msgobj.from_login, ': ') + hint('(( ') + chalk.hex('#808080')(msgobj.message) + hint(' ))')).replace(' :', ':')); }
         else if (msgobj.to != 0) {
           var toColor = room.getMemberById(msgobj.to).color;
@@ -84,9 +84,6 @@ chat.onOpen = function() {
 
       room.onSysMessage = function(msg) { log(event(msg)) };
 
-      room.onJoined = function() { updateOnlineList(); };
-      room.onLeave = function() { updateOnlineList(); };
-
       function updateOnlineList() {
         onlineField.clearItems();
         var members = room.getMembers();
@@ -108,17 +105,18 @@ chat.onOpen = function() {
 
         for (var i in members) {
           var obj = members[i];
-          if (obj.typing == true) { typingMembers.push(members[i]) };
+          if (obj.typing && obj.name != room.getMyMemberNick()) { typingMembers.push(members[i]) };
         };
-
-        typingMembers.length > 0 ? typingField.setContent(hint(typingMembers[0].name) + hint(typingMembers.length < 2 ? ' печатает...' : ' и другие печатают...')) : typingField.setContent('')
-
+        typingMembers.length > 0 ? typingField.setContent(hint(typingMembers[0].name) + hint(typingMembers.length < 2 ? ' печатает...' : ' и другие печатают...')) : typingField.setContent('');
         window.render();
       };
 
+      window.on('focus', function() { room.changeStatus(7) });
+      window.on('blur', function() { room.changeStatus(3) });
+
       inputField.key('enter', () => { room.sendMessage((inputField.getValue()).replace('\n', '')); inputField.clearValue(); });
     } else {
-    if (room.code == 3) { log(error('Комнаты ' + room.target + ' не существует.')) }
-    else { log(error('Необработанная ошибка:') + '\n\n' + error(JSON.stringify(room)) + '\n\n' + error('Пожалуйста, сохраните содержимое ошибки выше и создайте задачу по её исправлению на https://github.com/hypersad/wschatclient.'))}
+      if (room.code == 3) { log(error('Комнаты ' + room.target + ' не существует.')) }
+      else { log(error('Необработанная ошибка:') + '\n\n' + error(JSON.stringify(room)) + '\n\n' + error('Пожалуйста, сохраните содержимое ошибки выше и создайте задачу по её исправлению на https://github.com/hypersad/wschatclient.'))}
   }}, autoLogin: true, loadHistory: true });
 };
