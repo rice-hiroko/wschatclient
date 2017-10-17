@@ -1,5 +1,3 @@
 module.exports = {
-  APIKey: '',
-  roomToJoin: '',
-  bordersColor: ''
-};
+  APIKey: ''
+}
