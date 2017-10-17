@@ -1,9 +1,9 @@
 {
   "name": "wschatclient",
-  "version": "0.1.1",
-  "description": "Простой клиент чата в терминале",
+  "version": "0.1.2",
+  "author": "helix",
+  "description": "Клиент чата SinAir в терминале",
   "main": "chat.js",
-  "author": "hypersad",
   "license": "ISC",
   "scripts": {
     "start": "node chat.js"
