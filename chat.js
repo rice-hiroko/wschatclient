@@ -133,7 +133,7 @@ chat.onOpen = function() {
   }
 
   chat.joinRoom({
-    target: '#' + (process.argv[2] ? process.argv[2] : '#chat'),
+    target: '#' + (process.argv[2] ? process.argv[2] : 'chat'),
     callback: function(success, room) {
       if (success) {
         window.title = 'wschatclient - ' + room.getTarget();
@@ -261,19 +261,54 @@ chat.onOpen = function() {
           room.changeStatus(3)
         });
 
+        var myMessages = [];
+        var selectedMessage = myMessages.length;
+
         inputField.key('enter', () => {
           var message = inputField.getValue().replace('\n', '');
+          if (message != '') {
+            if (message == '/clear') {
+              chatField.setContent('');
+              log(gold('Ваш чат был очищен.'));
+              inputField.clearValue()
+            }
 
-          if (message == '/clear') {
-            chatField.setContent('');
-            log(gold('Ваш чат был очищен.'));
-            inputField.clearValue()
-          }
+            else {
+              room.sendMessage(message);
+              inputField.clearValue()
+            }
 
+            if (message != myMessages[myMessages.length - 1]) {
+              myMessages.push(message);
+              selectedMessage = myMessages.length
+            }
+          } 
+          
           else {
-            room.sendMessage(message);
-            inputField.clearValue()
+            inputField.clearValue();
+            window.render()
           }
+        });
+
+        inputField.key('up', () => {
+          if (selectedMessage > 0) {
+            inputField.setValue(myMessages[--selectedMessage])
+          };
+          
+          window.render()
+        });
+
+        inputField.key('down', () => {
+          if (selectedMessage < myMessages.length - 1) {
+            inputField.setValue(myMessages[++selectedMessage])
+          }
+
+          else if (inputField.getValue() == myMessages[myMessages.length - 1]) {
+            inputField.setValue('');
+            selectedMessage = myMessages.length
+          }
+
+          window.render()
         })
       }
 
