@@ -8,13 +8,18 @@ const config = require('./config');
 
 const chat = new wschat('wss://sinair.ru/ws/chat');
 
-const white   = chalk.white;
-const gray    = chalk.hex('#808080').bold;
-const gold    = chalk.hex('#FFD700').bold;
-const skyblue = chalk.hex('#87CEEB').bold;
-const tomato  = chalk.hex('#FF6347').bold;
+const white      = chalk.white;
+const gray       = chalk.hex('#808080').bold;
+const gold       = chalk.hex('#FFD700').bold;
+const skyblue    = chalk.hex('#87CEEB').bold;
+const tomato     = chalk.hex('#FF6347').bold;
+const paleyellow = chalk.hex('#EEEE88').bold;
+const paleblue   = chalk.hex('#9797FF').bold;
 
-const window = blessed.screen({ smartCSR: true, sendFocus: true });
+const window = blessed.screen({
+  smartCSR: true,
+  sendFocus: true
+});
 
 window.title = 'wschatclient';
 
@@ -29,7 +34,7 @@ const roomsBox  = blessed.box({
 
 const chatBox   = blessed.box({
   label:  'Чат',
-  width:  '100%-24',
+  width:  '70%',
   height: '100%-6',
   top:    3,
   border: {
@@ -39,7 +44,7 @@ const chatBox   = blessed.box({
 
 const onlineBox = blessed.box({
   label:  'В комнате',
-  width:  24,
+  width:  '30%',
   height: '100%-6',
   top:    3,
   right:  0,
@@ -130,7 +135,7 @@ chat.open();
 chat.onOpen = function() {
   if (config.APIKey != '') {
     chat.authByApiKey(config.APIKey, (success, userinfo) => {})
-  }
+  };
 
   chat.joinRoom({
     target: '#' + (process.argv[2] ? process.argv[2] : 'chat'),
@@ -149,20 +154,24 @@ chat.onOpen = function() {
 
           var userColor = chalk.hex(color).bold;
 
+          var message = msgobj.message.replace(/^> (?:([\s\S]+?)(?:^$)|([\s\S]+)$)/mg, paleyellow('$&')).replace(/https?:\/\/[^\s"']+/g, paleblue('$&'));
+
           if (msgobj.style == 0 && msgobj.to == 0) {
-            log((userColor(msgobj.from_login, ': ') + white(msgobj.message)).replace(' :', ':'))
+            log((userColor(msgobj.from_login, ': ') + white(message)).replace(' :', ':'))
           };
 
           if (msgobj.style == 1) {
-            log(gray('* ') + userColor(msgobj.from_login, '') + white(msgobj.message))
+            log(gray('* ') + userColor(msgobj.from_login, '') + white(message))
           };
 
           if (msgobj.style == 2) {
-            log(gray('* ') + white(white(msgobj.message)))
+            log(gray('* ') + white(message))
           };
 
           if (msgobj.style == 3) {
-            log((userColor(msgobj.from_login, ': ') + chalk.hex('#808080')('((', msgobj.message, '))')).replace(' :', ':'))
+            var message = msgobj.message.replace(/https?:\/\/[^\s"']+/g, chalk.hex('#9797FF')('$&'));
+            
+            log((userColor(msgobj.from_login, ': ') + chalk.hex('#808080')('((', message, '))')).replace(' :', ':'))
           };
 
           if (msgobj.to != 0) {
@@ -173,7 +182,7 @@ chat.onOpen = function() {
 
             var toUserColor = chalk.hex(toColor).bold;
 
-            log((gray('(лс) ') + userColor(msgobj.from_login) + gray(' > ') + toUserColor(room.getMemberById(msgobj.to).name, ': ') + white(msgobj.message)).replace(' :', ':'))
+            log((gray('(лс) ') + userColor(msgobj.from_login) + gray(' > ') + toUserColor(room.getMemberById(msgobj.to).name, ': ') + white(message)).replace(' :', ':'))
           }
         };
 
@@ -282,8 +291,8 @@ chat.onOpen = function() {
               myMessages.push(message);
               selectedMessage = myMessages.length
             }
-          } 
-          
+          }
+
           else {
             inputField.clearValue();
             window.render()
@@ -294,7 +303,7 @@ chat.onOpen = function() {
           if (selectedMessage > 0) {
             inputField.setValue(myMessages[--selectedMessage])
           };
-          
+
           window.render()
         });
 
@@ -308,6 +317,16 @@ chat.onOpen = function() {
             selectedMessage = myMessages.length
           }
 
+          window.render()
+        });
+
+        inputField.key(['C-up'], () => {
+          chatField.scroll(-1);
+          window.render()
+        });
+
+        inputField.key(['C-down'], () => {
+          chatField.scroll(1);
           window.render()
         })
       }
@@ -325,4 +344,4 @@ chat.onOpen = function() {
     autoLogin: true,
     loadHistory: true
   })
-}
+};
