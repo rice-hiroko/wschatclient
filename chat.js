@@ -293,7 +293,7 @@ inputField.focus();
     };
 
     chat.joinRoom({
-      target: '#wschatclient-dev',
+      target: '#chat',
       autoLogin: true,
       loadHistory: true
     });
