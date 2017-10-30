@@ -459,7 +459,7 @@ inputField.focus();
   chat.onOpen = function() {
     if (config.APIKey != '') {
       chat.authByApiKey(config.APIKey, (success, userinfo) => {
-        if (success) {
+        if (userinfo.user_id != 0) {
           isAuthorized = true
         }
       })
