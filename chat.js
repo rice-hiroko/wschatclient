@@ -17,6 +17,7 @@ const userstatus   = wschat.UserStatus;
 chat.open();
 
 var isOpened        = false;
+var isAuthorized    = false;
 var room            = null;
 var history         = {};
 var myMessages      = [];
@@ -302,6 +303,10 @@ inputField.focus();
             createRoomHintField.setContent(red('Комната с таким названием уже существует.'))
           }
 
+          else if (err.code == errorcode.access_denied && !isAuthorized) {
+            createRoomHintField.setContent(red('Для создания комнаты необходимо авторизироваться.'))
+          }
+
           else {
             createRoomHintField.setContent(red(`Неизвестная ошибка (${err.code}).`))
           };
@@ -453,11 +458,15 @@ inputField.focus();
 
   chat.onOpen = function() {
     if (config.APIKey != '') {
-      chat.authByApiKey(config.APIKey, (success, userinfo) => {})
+      chat.authByApiKey(config.APIKey, (success, userinfo) => {
+        if (success) {
+          isAuthorized = true
+        }
+      })
     };
 
     chat.joinRoom({
-      target: '#chat',
+      target: '#wschatclient-dev',
       autoLogin: true,
       loadHistory: true
     });
