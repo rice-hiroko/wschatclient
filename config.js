@@ -1,6 +1,7 @@
 module.exports = {
   Authorization: {
     Login:    '',
-    Password: ''
+    Password: '',
+    APIKey:   ''
   }
 }
