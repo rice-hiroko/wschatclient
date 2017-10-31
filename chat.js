@@ -32,7 +32,10 @@ const gold    = chalk.hex('#FFD700').bold;
 const skyblue = chalk.hex('#87CEEB').bold;
 const red     = chalk.hex('#FF5F5F').bold;
 
-const window = blessed.screen({ smartCSR: true, sendFocus: true });
+const window = blessed.screen({
+  smartCSR: true,
+  sendFocus: true
+});
 
 window.title = 'wschatclient';
 
@@ -40,21 +43,168 @@ process.on('SIGWINCH', () => {
   window.emit('resize')
 });
 
-const roomsBox   = blessed.box({ label: 'Комнаты', width: '100%', height: 3, border: { type: 'line' } });
-const chatBox    = blessed.box({ label: 'Чат', width: '70%', height: '100%-6', top: 3, border: { type: 'line' } });
-const onlineBox  = blessed.box({ label: 'В комнате', width: '30%', height: '100%-6', top: 3, right: 0, border: { type: 'line' } });
-const inputBox   = blessed.box({ label: 'Ваше сообщение', width: '100%', height: 3, bottom: 0, border: { type: 'line' } });
-const warningBox = blessed.box({ width: 39, height: 7, inputOnFocus: true, padding: 1, left: 'center', top: 'center', align: 'center', border: { type: 'line', fg: '#FF6347' } });
-const dialogBox  = blessed.box({ width: 39, height: 9, padding: { top: 1, right: 1, left: 1 }, left: 'center', top: 'center', border: { type: 'line' }, style: { label: {} } });
 
-const roomsField       = tabswidget({ parent: roomsBox, style: { selected: { fg: 'white', bold: true, inverse: true }, item: { fg: 'white', bold: true } } });
-const chatField        = blessed.log({ parent: chatBox, height: '100%-3', mouse: true, padding: { left:  1, right: 1 }, style: { fg: 'white' } });
-const typingField      = blessed.box({ parent: chatBox, height: 1, bottom: 0, padding: { left:  1, right: 1 } });
-const onlineField      = blessed.list({ parent: onlineBox, interactive: false, padding: { left:  1, right: 1 } });
-const inputField       = blessed.textarea({ parent: inputBox, inputOnFocus: true, padding: { left:  1, right: 1 } });
-const dialogDescField  = blessed.box({ parent: dialogBox, height: 1, top: 0, align: 'center' });
-const dialogInputField = blessed.textarea({ parent: dialogBox, inputOnFocus: true, height: 1, top: 2, style: { bold: true, inverse: true } });
-const dialogHintField  = blessed.box({ parent: dialogBox, height: 2, bottom: 0, align: 'center' });
+/**
+ * Определение простых областей
+ */
+
+  const roomsBox = blessed.box({
+    label:  'Комнаты',
+    width:  '100%',
+    height: 3,
+    border: {
+      type: 'line'
+    }
+  });
+
+  const chatBox = blessed.box({
+    label:  'Чат',
+    width:  '70%',
+    height: '100%-6',
+    top:    3,
+    border: {
+      type: 'line'
+    }
+  });
+
+  const onlineBox = blessed.box({
+    label:  'В комнате',
+    width:  '30%',
+    height: '100%-6',
+    top:    3,
+    right:  0,
+    border: {
+      type: 'line'
+    }
+  });
+
+  const inputBox = blessed.box({
+    label:  'Ваше сообщение',
+    width:  '100%',
+    height: 3,
+    bottom: 0,
+    border: {
+      type: 'line'
+    }
+  });
+
+  const warningBox = blessed.box({
+    width:        39,
+    height:       7,
+    top:          'center',
+    left:         'center',
+    align:        'center',
+    inputOnFocus: true,
+    padding:      1,
+    border: {
+      type: 'line',
+      fg:   '#FF6347'
+    }
+  });
+
+  const dialogBox = blessed.box({
+    width:  39,
+    height: 9,
+    top:    'center',
+    left:   'center',
+    padding: {
+      top:   1,
+      left:  1,
+      right: 1
+    },
+    border: {
+      type: 'line'
+    },
+    style: {
+      label: {
+      }
+    }
+  });
+
+/**
+ * Определение функциональных областей
+ */
+
+  const roomsField = tabswidget({
+    parent: roomsBox,
+    style: {
+      selected: {
+        fg:      'white',
+        bold:    true,
+        inverse: true
+      },
+      item: {
+        fg:   'white',
+        bold: true
+      }
+    }
+  });
+
+  const chatField = blessed.log({
+    parent: chatBox,
+    height: '100%-3',
+    mouse:  true,
+    padding: {
+      left:  1,
+      right: 1
+    },
+    style: {
+      fg: 'white'
+    }
+  });
+
+  const typingField = blessed.box({
+    parent: chatBox,
+    height: 1,
+    bottom: 0,
+    padding: {
+      left:  1,
+      right: 1
+    }
+  });
+
+  const onlineField = blessed.list({
+    parent:      onlineBox,
+    interactive: false,
+    padding: {
+      left:  1,
+      right: 1
+    }
+  });
+
+  const inputField = blessed.textarea({
+    parent:       inputBox,
+    inputOnFocus: true,
+    padding: {
+      left:  1,
+      right: 1
+    }
+  });
+
+  const dialogDescField = blessed.box({
+    parent: dialogBox,
+    height: 1,
+    top:    0,
+    align:  'center'
+  });
+
+  const dialogInputField = blessed.textarea({
+    parent:       dialogBox,
+    inputOnFocus: true,
+    height:       1,
+    top:          2,
+    style: {
+      bold:    true,
+      inverse: true
+    }
+  });
+
+const dialogHintField = blessed.box({
+  parent: dialogBox,
+  height: 2,
+  bottom: 0,
+  align:  'center'
+});
 
 window.append(roomsBox);
 window.append(chatBox);
@@ -133,9 +283,7 @@ inputField.focus();
 
       inputField.clearValue();
       selectedMessage = myMessages.length
-    }
-
-    else {
+    } else {
       inputField.clearValue();
       window.render()
     }
@@ -190,17 +338,13 @@ inputField.focus();
 
     if (input == '#') {
       callDialogBox(0)
-    }
-
-    else {
+    } else {
       if (dialogBox.type == 1) {
         chat.createRoom(input, (success, err) => {
           if (success) {
             callDialogBox(0);
             return true
-          }
-
-          else {
+          } else {
             if (err.code == errorcode.invalid_target) {
               dialogHintField.setContent(red('Недопустимое название комнаты.'))
             }
@@ -211,9 +355,7 @@ inputField.focus();
 
             else if (err.code == errorcode.access_denied && !isAuthorized) {
               dialogHintField.setContent(red('Для создания комнаты необходимо авторизироваться.'))
-            }
-
-            else {
+            } else {
               dialogHintField.setContent(red(`Неизвестная ошибка (${err.code}).`))
             };
 
@@ -230,9 +372,7 @@ inputField.focus();
             if (success) {
               callDialogBox(0);
               return true
-            }
-
-            else {
+            } else {
               if (roomobj.code == errorcode.already_connected) {
                 dialogHintField.setContent(red('Вы уже подключены к данной комнате.'))
               }
@@ -260,20 +400,14 @@ inputField.focus();
           dialogInputField.clearValue();
           dialogHintField.setContent(red('Для удаления комнаты вы должны находится в ней.'));
           window.render()
-        }
-
-        else {
+        } else {
           chat.removeRoom(input, (success, err) => {
             if (success) {
               callDialogBox(0)
-            }
-
-            else {
+            } else {
               if (err.code == errorcode.access_denied) {
                 dialogHintField.setContent(red('Вы не являетесь создателем комнаты.'))
-              }
-
-              else {
+              } else {
                 dialogHintField.setContent(red(`Неизвестная ошибка (${err.code}).`))
               };
 
@@ -354,9 +488,7 @@ inputField.focus();
       dialogBox.show();
       dialogInputField.focus();
       window.render()
-    }
-
-    else {
+    } else {
       dialogInputField.cancel();
       dialogBox.hide();
       inputField.focus();
@@ -432,18 +564,14 @@ inputField.focus();
       chat.authByLoginAndPassword(userlogin, userpassword, (success, userinfo) => {
         if (success) {
           isAuthorized: true
-        }
-
-        else {
+        } else {
           if (userinfo.code == errorcode.access_denied) {
             warningBox.setContent(red('Ошибка при авторизации:\nПревышено количество попыток авторизации, попробуйте позже.'));
           }
 
           else if (userinfo.code == errorcode.incorrect_loginpass) {
             warningBox.setContent(red('Ошибка при авторизации:\nНеверный логин и/или пароль.'));
-          }
-
-          else {
+          } else {
             warningBox.setContent(red(`Ошибка при авторизации:\nНеизвестная ошибка (${userinfo.code}).`));
           };
 
@@ -456,7 +584,7 @@ inputField.focus();
     };
 
     chat.joinRoom({
-      target: '#chat,
+      target: '#chat',
       autoLogin: true,
       loadHistory: true
     });
@@ -474,15 +602,11 @@ inputField.focus();
       if (roomsField.ritems.indexOf(room.getTarget()) == 0) {
         roomsField.selectCurrentTab();
         updateRoomsList()
-      }
-
-      else {
+      } else {
         roomsField.moveAndSelectLeft();
         updateRoomsList()
       }
-    }
-
-    else {
+    } else {
       chatField.setContent('');
       onlineField.clearItems();
       roomsField.clearItems();
