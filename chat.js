@@ -16,6 +16,7 @@ const userstatus   = wschat.UserStatus;
 
 const userlogin    = config.Authorization.Login;
 const userpassword = config.Authorization.Password;
+const userapikey   = config.Authorization.APIKey;
 
 var isOpened        = false;
 var isAuthorized    = false;
@@ -560,10 +561,10 @@ inputField.focus();
  */
 
   chat.onOpen = function() {
-    if (userlogin != '' && userpassword != '') {
+    if (userlogin != '' && userpassword != '' && !isAuthorized) {
       chat.authByLoginAndPassword(userlogin, userpassword, (success, userinfo) => {
         if (success) {
-          isAuthorized: true
+          isAuthorized = true
         } else {
           if (userinfo.code == errorcode.access_denied) {
             warningBox.setContent(red('Ошибка при авторизации:\nПревышено количество попыток авторизации, попробуйте позже.'));
@@ -583,6 +584,19 @@ inputField.focus();
       })
     };
 
+    if (userapikey != '' && !isAuthorized) {
+      chat.authByApiKey(userapikey, (success, userinfo) => {
+        if (userinfo.user_id != 0) {
+          isAuthorized = true
+        } else {
+          warningBox.setContent(red('Ошибка при авторизации:\nНеверный API ключ.'));
+          inputField.cancel();
+          warningBox.show();
+          warningBox.focus();
+          window.render()
+        }
+      })
+    }
     chat.joinRoom({
       target: '#chat',
       autoLogin: true,
