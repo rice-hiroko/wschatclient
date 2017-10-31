@@ -14,7 +14,8 @@ const errorcode    = wschat.ErrorCode;
 const messagestyle = wschat.MessageStyle;
 const userstatus   = wschat.UserStatus;
 
-chat.open();
+const userlogin    = config.Authorization.Login;
+const userpassword = config.Authorization.Password;
 
 var isOpened        = false;
 var isAuthorized    = false;
@@ -22,6 +23,8 @@ var room            = null;
 var history         = {};
 var myMessages      = [];
 var selectedMessage = myMessages.length;
+
+chat.open();
 
 const white   = chalk.white;
 const gray    = chalk.hex('#808080').bold;
@@ -37,51 +40,38 @@ process.on('SIGWINCH', () => {
   window.emit('resize')
 });
 
-const roomsBox      = blessed.box({ label: 'Комнаты', width: '100%', height: 3, border: { type: 'line' } });
-const chatBox       = blessed.box({ label: 'Чат', width: '70%', height: '100%-6', top: 3, border: { type: 'line' } });
-const onlineBox     = blessed.box({ label: 'В комнате', width: '30%', height: '100%-6', top: 3, right: 0, border: { type: 'line' } });
-const inputBox      = blessed.box({ label: 'Ваше сообщение:', width: '100%', height: 3, bottom: 0, border: { type: 'line' } });
-const joinToBox     = blessed.box({ label: 'Подключение к комнате', width: 39, height: 9, padding: { right: 1, left: 1 }, left: 'center', top: 'center', border: { type: 'line' } });
-const createRoomBox = blessed.box({ label: 'Создание комнаты', width: 39, height: 9, padding: { right: 1, left: 1 }, left: 'center', top: 'center', border: { type: 'line' } });
-const removeRoomBox = blessed.box({ label: 'Удаление комнаты', width: 39, height: 9, padding: { right: 1, left: 1 }, left: 'center', top: 'center', border: { type: 'line', fg: '#FF6347' }, style: { label: { fg: '#FF6347' } } });
+const roomsBox   = blessed.box({ label: 'Комнаты', width: '100%', height: 3, border: { type: 'line' } });
+const chatBox    = blessed.box({ label: 'Чат', width: '70%', height: '100%-6', top: 3, border: { type: 'line' } });
+const onlineBox  = blessed.box({ label: 'В комнате', width: '30%', height: '100%-6', top: 3, right: 0, border: { type: 'line' } });
+const inputBox   = blessed.box({ label: 'Ваше сообщение', width: '100%', height: 3, bottom: 0, border: { type: 'line' } });
+const warningBox = blessed.box({ width: 39, height: 7, inputOnFocus: true, padding: 1, left: 'center', top: 'center', align: 'center', border: { type: 'line', fg: '#FF6347' } });
+const dialogBox  = blessed.box({ width: 39, height: 9, padding: { top: 1, right: 1, left: 1 }, left: 'center', top: 'center', border: { type: 'line' }, style: { label: {} } });
 
-const roomsField          = tabswidget({ parent: roomsBox, padding: { right: 1 }, style: { selected: { fg: 'white', bold: true, inverse: true }, item: { fg: 'white', bold: true } } });
-const chatField           = blessed.log({ parent: chatBox, height: '100%-3', mouse: true, padding: { left:  1, right: 1 }, style: { fg: 'white' } });
-const typingField         = blessed.box({ parent: chatBox, height: 1, bottom: 0, padding: { left:  1, right: 1 } });
-const onlineField         = blessed.list({ parent: onlineBox, interactive: false, padding: { left:  1, right: 1 } });
-const inputField          = blessed.textarea({ parent: inputBox, inputOnFocus: true, padding: { left:  1, right: 1 } });
-const joinToField         = blessed.textarea({ parent: joinToBox, inputOnFocus: true, height: 1, top: 3, style: { fg: 'white', bold: true, inverse: true } });
-const joinToDescField     = blessed.box({ parent: joinToBox, content: white.bold('Введите название комнаты'), height: 1, top: 1, align: 'center' })
-const joinToHintField     = blessed.box({ parent: joinToBox, height: 1, bottom: 0, align: 'center' });
-const createRoomField     = blessed.textarea({ parent: createRoomBox, inputOnFocus: true, height: 1, top: 3, style: { fg: 'white', bold: true, inverse: true } });
-const createRoomDescField = blessed.box({ parent: createRoomBox, content: white.bold('Введите название новой комнаты'), height: 1, top: 1, align: 'center' });
-const createRoomHintField = blessed.box({ parent: createRoomBox, height: 2, bottom: 0, align: 'center' });
-const removeRoomField     = blessed.textarea({ parent: removeRoomBox, inputOnFocus: true, height: 1, top: 3, style: { fg: '#FF6347', bold: true, inverse: true } });
-const removeRoomDescField = blessed.box({ parent: removeRoomBox, content: red('Введите название удаляемой комнаты'), height: 1, top: 1, align: 'center' });
-const removeRoomHintField = blessed.box({ parent: removeRoomBox, height: 2, bottom: 0, align: 'center' });
+const roomsField       = tabswidget({ parent: roomsBox, style: { selected: { fg: 'white', bold: true, inverse: true }, item: { fg: 'white', bold: true } } });
+const chatField        = blessed.log({ parent: chatBox, height: '100%-3', mouse: true, padding: { left:  1, right: 1 }, style: { fg: 'white' } });
+const typingField      = blessed.box({ parent: chatBox, height: 1, bottom: 0, padding: { left:  1, right: 1 } });
+const onlineField      = blessed.list({ parent: onlineBox, interactive: false, padding: { left:  1, right: 1 } });
+const inputField       = blessed.textarea({ parent: inputBox, inputOnFocus: true, padding: { left:  1, right: 1 } });
+const dialogDescField  = blessed.box({ parent: dialogBox, height: 1, top: 0, align: 'center' });
+const dialogInputField = blessed.textarea({ parent: dialogBox, inputOnFocus: true, height: 1, top: 2, style: { bold: true, inverse: true } });
+const dialogHintField  = blessed.box({ parent: dialogBox, height: 2, bottom: 0, align: 'center' });
 
 window.append(roomsBox);
 window.append(chatBox);
 window.append(onlineBox);
 window.append(inputBox);
-window.append(joinToBox);
-window.append(createRoomBox);
-window.append(removeRoomBox);
+window.append(warningBox);
+window.append(dialogBox);
 
-joinToBox.hide();
-createRoomBox.hide();
-removeRoomBox.hide();
+warningBox.hide();
+dialogBox.hide();
 
 window.render();
+
 inputField.focus();
 
 /**
  * Определение горячих клавиш
- *
- * inputField      - поле ввода сообщения
- * joinToField     - поле ввода названия комнаты для подключения
- * createRoomField - поле ввода названия комнаты для создания
- * removeRoomField - поле ввода названия комнаты для подтверждения удаления
  */
 
   inputField.key('escape', () => {
@@ -94,35 +84,23 @@ inputField.focus();
     process.exit(0)
   });
 
-  inputField.key(['C-e'], () => {
-    joinToHintField.setContent('');
-    inputField.cancel();
-    joinToBox.show();
-    joinToField.focus();
-    window.render()
+  inputField.key(['C-n'], () => {
+    callDialogBox(1)
   });
+
+  inputField.key(['C-e'], () => {
+    callDialogBox(2)
+  });
+
+  inputField.key(['C-r'], () => {
+    callDialogBox(3)
+  })
 
   inputField.key(['C-q'], () => {
     if (room != null) {
       chat.leaveRoom(room.target)
     }
   });
-
-  inputField.key(['C-n'], () => {
-    createRoomHintField.setContent('');
-    inputField.cancel();
-    createRoomBox.show();
-    createRoomField.focus();
-    window.render()
-  });
-
-  inputField.key(['C-r'], () => {
-    removeRoomHintField.setContent('');
-    inputField.cancel();
-    removeRoomBox.show();
-    removeRoomField.focus();
-    window.render()
-  })
 
   inputField.key(['C-left'], () => {
     roomsField.moveAndSelectLeft();
@@ -177,7 +155,7 @@ inputField.focus();
     }
 
     else if (inputField.getValue() == myMessages[myMessages.length - 1]) {
-      inputField.setValue('');
+      inputField.clearValue();
       selectedMessage = myMessages.length
     };
 
@@ -196,184 +174,123 @@ inputField.focus();
 
 
 
-  joinToField.key('escape', () => {
-    joinToField.focus();
-    joinToField.clearValue();
+  dialogInputField.key('escape', () => {
+    dialogInputField.focus();
+    dialogInputField.clearValue();
     window.render()
   });
 
-  joinToField.key(['C-c', 'C-e'], () => {
-    joinToField.clearValue();
-    joinToField.cancel();
-    joinToBox.hide();
-    inputField.focus();
-    window.render()
+  dialogInputField.key(['C-c'], () => {
+    callDialogBox(0)
   });
 
-  joinToField.key('enter', () => {
-    let _input = joinToField.getValue().replace('\n', '');
+  dialogInputField.key('enter', () => {
+    let _input = dialogInputField.getValue().replace('\n', '');
     let input = _input.startsWith('#') ? _input : '#' + _input;
 
     if (input == '#') {
-      joinToField.clearValue();
-      joinToField.cancel();
-      joinToBox.hide();
-      inputField.focus();
-      window.render();
+      callDialogBox(0)
     }
 
     else {
-      chat.joinRoom({
-        target: input,
-        callback: (success, roomobj) => {
+      if (dialogBox.type == 1) {
+        chat.createRoom(input, (success, err) => {
           if (success) {
-            joinToField.cancel();
-            joinToBox.hide();
-            inputField.focus();
+            callDialogBox(0);
             return true
           }
 
           else {
-            if (roomobj.code == errorcode.already_connected) {
-              joinToHintField.setContent(red('Вы уже подключены к данной комнате.'))
+            if (err.code == errorcode.invalid_target) {
+              dialogHintField.setContent(red('Недопустимое название комнаты.'))
             }
 
-            else if (roomobj.code == errorcode.not_found) {
-              joinToHintField.setContent(red('Такой комнаты не существует.'))
+            else if (err.code == errorcode.already_exists) {
+              dialogHintField.setContent(red('Комната с таким названием уже существует.'))
+            }
+
+            else if (err.code == errorcode.access_denied && !isAuthorized) {
+              dialogHintField.setContent(red('Для создания комнаты необходимо авторизироваться.'))
             }
 
             else {
-              joinToHintField.setContent(red(`Неизвестная ошибка (${roomobj.code}).`))
+              dialogHintField.setContent(red(`Неизвестная ошибка (${err.code}).`))
             };
 
+            dialogInputField.clearValue();
             window.render()
           }
-        },
-        autoLogin: true,
-        loadHistory: true
-      });
+        })
+      }
 
-      joinToField.clearValue()
-    }
-  });
+      else if (dialogBox.type == 2) {
+        chat.joinRoom({
+          target: input,
+          callback: (success, roomobj) => {
+            if (success) {
+              callDialogBox(0);
+              return true
+            }
 
+            else {
+              if (roomobj.code == errorcode.already_connected) {
+                dialogHintField.setContent(red('Вы уже подключены к данной комнате.'))
+              }
 
+              else if (roomobj.code == errorcode.not_found) {
+                dialogHintField.setContent(red('Такой комнаты не существует.'))
+              }
 
-  createRoomField.key('escape', () => {
-    createRoomField.focus();
-    createRoomField.clearValue();
-    window.render()
-  });
+              else {
+                dialogHintField.setContent(red(`Неизвестная ошибка (${roomobj.code}).`))
+              };
 
-  createRoomField.key(['C-c', 'C-n'], () => {
-    createRoomField.clearValue();
-    createRoomField.cancel();
-    createRoomBox.hide();
-    inputField.focus();
-    window.render()
-  });
+              window.render()
+            }
+          },
+          autoLogin: true,
+          loadHistory: true
+        });
 
-  createRoomField.key('enter', () => {
-    let _input = createRoomField.getValue().replace('\n', '');
-    let input = _input.startsWith('#') ? _input : '#' + _input;
-    if (input == '#') {
-      createRoomField.clearValue()
-      createRoomField.cancel();
-      createRoomBox.hide();
-      inputField.focus();
-      window.render()
-    }
+        dialogInputField.clearValue()
+      }
 
-    else {
-      chat.createRoom(input, (success, err) => {
-        if (success) {
-          createRoomField.clearValue()
-          createRoomField.cancel();
-          createRoomBox.hide();
-          inputField.focus();
-          return true
-        }
-
-        else {
-          if (err.code == errorcode.invalid_target) {
-            createRoomHintField.setContent(red('Недопустимое название комнаты.'))
-          }
-
-          else if (err.code == errorcode.already_exists) {
-            createRoomHintField.setContent(red('Комната с таким названием уже существует.'))
-          }
-
-          else if (err.code == errorcode.access_denied && !isAuthorized) {
-            createRoomHintField.setContent(red('Для создания комнаты необходимо авторизироваться.'))
-          }
-
-          else {
-            createRoomHintField.setContent(red(`Неизвестная ошибка (${err.code}).`))
-          };
-
-          createRoomField.clearValue();
-          window.render()
-        }
-      })
-    }
-  });
-
-
-
-  removeRoomField.key('escape', () => {
-    removeRoomField.focus();
-    removeRoomField.clearValue();
-    window.render()
-  });
-
-  removeRoomField.key(['C-c', 'C-r'], () => {
-    removeRoomField.clearValue();
-    removeRoomField.cancel();
-    removeRoomBox.hide();
-    inputField.focus();
-    window.render()
-  });
-
-  removeRoomField.key('enter', () => {
-    let _input = removeRoomField.getValue().replace('\n', '');
-    let input = _input.startsWith('#') ? _input : '#' + _input;
-
-    if (input == '#') {
-      removeRoomField.clearValue();
-      removeRoomField.cancel();
-      removeRoomBox.hide();
-      inputField.focus();
-      window.render()
-    }
-
-    else if (input != room.target) {
-      removeRoomField.clearValue();
-      removeRoomHintField.setContent(red('Для удаления комнаты вы должны находится в ней.'));
-      window.render()
-    }
-
-    else {
-      chat.removeRoom(input, (success, err) => {
-        if (success) {
-          removeRoomField.cancel();
-          removeRoomBox.hide();
-          inputField.focus();
+      else if (dialogBox.type == 3) {
+        if (input != room.target) {
+          dialogInputField.clearValue();
+          dialogHintField.setContent(red('Для удаления комнаты вы должны находится в ней.'));
           window.render()
         }
 
         else {
-          if (err.code == errorcode.access_denied) {
-            removeRoomHintField.setContent(red('Вы не являетесь создателем комнаты.'))
-          }
+          chat.removeRoom(input, (success, err) => {
+            if (success) {
+              callDialogBox(0)
+            }
 
-          else {
-            removeRoomHintField.setContent(red(`Неизвестная ошибка (${err.code}).`))
-          };
+            else {
+              if (err.code == errorcode.access_denied) {
+                dialogHintField.setContent(red('Вы не являетесь создателем комнаты.'))
+              }
 
-          window.render()
+              else {
+                dialogHintField.setContent(red(`Неизвестная ошибка (${err.code}).`))
+              };
+
+              window.render()
+            }
+          })
         }
-      })
+      }
     }
+  });
+
+
+
+  warningBox.on('keypress', () => {
+    warningBox.hide();
+    inputField.focus();
+    window.render()
   });
 
 /**
@@ -391,6 +308,60 @@ inputField.focus();
 
     history[rname] = history[rname] || [];
     history[rname].push(text)
+  };
+
+  function callDialogBox(type) {
+    /**
+     * 0 - обнулить свойства диалога и скрыть его
+     * 1 - диалог создания новой комнаты
+     * 2 - диалог подключения к комнате
+     * 3 - диалог удаления комнаты
+     */
+     dialogBox.type = '0';
+     dialogBox.setLabel('');
+     dialogBox.style.border.fg = '';
+     dialogBox.style.label.fg = '';
+     dialogDescField.setContent('');
+     dialogInputField.clearValue();
+     dialogInputField.style.fg = '';
+     dialogHintField.setContent('');
+
+     if (type != 0) {
+       if (type == 1) {
+         dialogBox.type = '1';
+         dialogBox.setLabel('Создание комнаты');
+         dialogDescField.setContent(white.bold('Введите название новой комнаты'));
+         dialogInputField.style.fg = 'white'
+       }
+
+       else if (type == 2) {
+         dialogBox.type = '2';
+         dialogBox.setLabel('Подключение к комнате');
+         dialogDescField.setContent(white.bold('Введите название комнаты'));
+         dialogInputField.style.fg = 'white'
+       }
+
+       else if (type == 3) {
+         dialogBox.type = '3';
+         dialogBox.setLabel('Удаление комнаты');
+         dialogBox.style.border.fg = '#FF6347';
+         dialogBox.style.label.fg = '#FF6347';
+         dialogDescField.setContent(red('Введите название удаляемой комнаты'));
+         dialogInputField.style.fg = '#FF6347'
+      }
+
+      inputField.cancel();
+      dialogBox.show();
+      dialogInputField.focus();
+      window.render()
+    }
+
+    else {
+      dialogInputField.cancel();
+      dialogBox.hide();
+      inputField.focus();
+      window.render();
+    }
   };
 
   function roomChanged() {
@@ -457,10 +428,29 @@ inputField.focus();
  */
 
   chat.onOpen = function() {
-    if (config.APIKey != '') {
-      chat.authByApiKey(config.APIKey, (success, userinfo) => {
-        if (userinfo.user_id != 0) {
-          isAuthorized = true
+    if (userlogin != '' && userpassword != '') {
+      chat.authByLoginAndPassword(userlogin, userpassword, (success, userinfo) => {
+        if (success) {
+          isAuthorized: true
+        }
+
+        else {
+          if (userinfo.code == errorcode.access_denied) {
+            warningBox.setContent(red('Ошибка при авторизации:\nПревышено количество попыток авторизации, попробуйте позже.'));
+          }
+
+          else if (userinfo.code == errorcode.incorrect_loginpass) {
+            warningBox.setContent(red('Ошибка при авторизации:\nНеверный логин и/или пароль.'));
+          }
+
+          else {
+            warningBox.setContent(red(`Ошибка при авторизации:\nНеизвестная ошибка (${userinfo.code}).`));
+          };
+
+          inputField.cancel();
+          warningBox.show();
+          warningBox.focus();
+          window.render();
         }
       })
     };
