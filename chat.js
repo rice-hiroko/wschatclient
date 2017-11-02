@@ -22,6 +22,7 @@ var isOpened        = false;
 var isAuthorized    = false;
 var room            = null;
 var history         = {};
+var lastPMSender    = 0;
 var myMessages      = [];
 var selectedMessage = myMessages.length;
 
@@ -271,6 +272,15 @@ inputField.focus();
         chatField.setContent('');
         hlog(room.target, gold('Ваш чат был очищен.'));
         window.render()
+      }
+
+      if (input.startsWith('/re ')) {
+        if (lastPMSender != 0) {
+          let message = input.replace('/re ', '');
+          room.sendMessage(`/umsg ${lastPMSender} ${message}`)
+        } else {
+          hlog(room.target, gold('Вам еще никто не писал в ЛС.'))
+        }
       }
 
       else if (roomsField.ritems.length > 0) {
@@ -643,7 +653,7 @@ inputField.focus();
     let htarget = msgobj.target;
 
     let userColor = chalk.hex(helper.hexifyColor(msgobj.color)).bold;
-    let message = msgobj.message.replace(/https?:\/\/[^\s"']+/g, chalk.hex('#9797FF').bold('$&'));
+    let message = msgobj.message.replace(/https?:\/\/[^\s"']+/g, chalk.hex('#9797FF')('$&'));
 
     if (msgobj.style == messagestyle.message && msgobj.to == 0) {
       let content = (userColor(msgobj.from_login, ': ') + message).replace(' :', ':');
@@ -667,6 +677,10 @@ inputField.focus();
     };
 
     if (msgobj.to != 0) {
+      if (msgobj.from_login != room.getMyMemberNick()) {
+        lastPMSender = msgobj.from
+      };
+
       let toUserColor = chalk.hex(helper.hexifyColor(room.getMemberById(msgobj.to).color)).bold;
 
       let content = (gray('(лс) ') + userColor(msgobj.from_login) + gray(' > ') + toUserColor(room.getMemberById(msgobj.to).name, ': ') + white(message)).replace(' :', ':');
