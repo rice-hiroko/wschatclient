@@ -7,6 +7,8 @@ const blessed = require('blessed');
 const config     = require('./config');
 const tabswidget = require('./lib/widgets/tabs');
 
+const Timer = require('./lib/timer');
+
 const chat = new wschat('wss://sinair.ru/ws/chat');
 
 chat.open();
@@ -26,6 +28,10 @@ let history         = {};
 let lastPMSender    = 0;
 let myMessages      = [];
 let selectedMessage = myMessages.length;
+
+let timerTyping = new Timer(() => {
+  setTyping(false)
+});
 
 const white   = chalk.white;
 const gray    = chalk.hex('#808080').bold;
@@ -236,6 +242,7 @@ inputField.focus();
  */
 
   inputField.key('escape', () => {
+    setTyping(false);
     inputField.focus();
     inputField.clearValue();
     screen.render()
@@ -274,6 +281,8 @@ inputField.focus();
   });
 
   inputField.key('enter', () => {
+    setTyping(false);
+
     let input = inputField.getValue().replace('\n', '');
     if (input != '') {
       if (input == '/clear') {
@@ -340,6 +349,25 @@ inputField.focus();
     screen.render()
   });
 
+  inputField.key('backspace', () => {
+    let input = inputField.getValue().replace('\n', '');
+    if (input == '') {
+      setTyping(false)
+    }
+  });
+
+  inputField.on('keypress', (ch, key) => {
+    if (key.full != 'escape'    && key.full != 'tab'    &&
+        key.full != 'home'      && key.full != 'right'  &&
+        key.full != 'insert'    && key.full != 'end'    &&
+        key.full != 'pagedown'  && key.full != 'pageup' &&
+        key.full != 'return'    && key.full != 'enter'  &&
+        key.full != 'delete'    && key.full != 'down'   &&
+        key.full != 'up'        && key.full != 'left'   &&
+        !key.ctrl) {
+          setTyping(true)
+        }
+  });
 
 
   dialogInputField.key('escape', () => {
@@ -598,6 +626,25 @@ inputField.focus();
 
     [value] || value
   };
+
+  function setTyping(value) {
+    if (value){
+      if (!timerTyping.started){
+        sendTyping(true)
+      }
+      timerTyping.start(5)
+    } else {
+      timerTyping.stop();
+      sendTyping(false)
+    }
+  };
+
+  function sendTyping(value) {
+    if (room != null && room.getMyMemberNick() != ''){
+      room.changeStatus(value ? userstatus.typing : userstatus.stop_typing)
+    }
+  };
+
 
 /**
  * Обработка событий в чате
