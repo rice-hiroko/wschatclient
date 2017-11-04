@@ -5,10 +5,11 @@ const chalk   = require('chalk');
 const blessed = require('blessed');
 
 const config     = require('./config');
-const helper     = require('./lib/helpers');
 const tabswidget = require('./lib/widgets/tabs');
 
 const chat = new wschat('wss://sinair.ru/ws/chat');
+
+chat.open();
 
 const errorcode    = wschat.ErrorCode;
 const messagestyle = wschat.MessageStyle;
@@ -18,39 +19,43 @@ const userlogin    = config.Authorization.Login;
 const userpassword = config.Authorization.Password;
 const userapikey   = config.Authorization.APIKey;
 
-var isOpened        = false;
-var isAuthorized    = false;
-var room            = null;
-var history         = {};
-var lastPMSender    = 0;
-var myMessages      = [];
-var selectedMessage = myMessages.length;
-
-chat.open();
+let isOpened        = false;
+let isAuthorized    = false;
+let room            = null;
+let history         = {};
+let lastPMSender    = 0;
+let myMessages      = [];
+let selectedMessage = myMessages.length;
 
 const white   = chalk.white;
 const gray    = chalk.hex('#808080').bold;
 const gold    = chalk.hex('#FFD700').bold;
 const skyblue = chalk.hex('#87CEEB').bold;
-const red     = chalk.hex('#FF5F5F').bold;
+const red     = chalk.hex('#FF6666').bold;
 
-const window = blessed.screen({
+const screen = blessed.screen({
   smartCSR: true,
   sendFocus: true
 });
 
-window.title = 'wschatclient';
+const window = blessed.box({
+  width: '100%',
+  height: '100%'
+});
+
+screen.title = 'wschatclient';
 
 process.on('SIGWINCH', () => {
-  window.emit('resize')
+  screen.emit('resize')
 });
+
 
 
 /**
  * Определение простых областей
  */
-
-  const roomsBox = blessed.box({
+  const roomsBox   = blessed.box({
+    parent: window,
     label:  'Комнаты',
     width:  '100%',
     height: 3,
@@ -59,7 +64,8 @@ process.on('SIGWINCH', () => {
     }
   });
 
-  const chatBox = blessed.box({
+  const chatBox    = blessed.box({
+    parent: window,
     label:  'Чат',
     width:  '70%',
     height: '100%-6',
@@ -69,7 +75,8 @@ process.on('SIGWINCH', () => {
     }
   });
 
-  const onlineBox = blessed.box({
+  const onlineBox  = blessed.box({
+    parent: window,
     label:  'В комнате',
     width:  '30%',
     height: '100%-6',
@@ -80,7 +87,8 @@ process.on('SIGWINCH', () => {
     }
   });
 
-  const inputBox = blessed.box({
+  const inputBox   = blessed.box({
+    parent: window,
     label:  'Ваше сообщение',
     width:  '100%',
     height: 3,
@@ -91,6 +99,7 @@ process.on('SIGWINCH', () => {
   });
 
   const warningBox = blessed.box({
+    parent:       window,
     width:        39,
     height:       7,
     top:          'center',
@@ -100,11 +109,12 @@ process.on('SIGWINCH', () => {
     padding:      1,
     border: {
       type: 'line',
-      fg:   '#FF6347'
+      fg:   '#F88'
     }
   });
 
-  const dialogBox = blessed.box({
+  const dialogBox  = blessed.box({
+    parent: window,
     width:  39,
     height: 9,
     top:    'center',
@@ -123,11 +133,13 @@ process.on('SIGWINCH', () => {
     }
   });
 
+
+
 /**
  * Определение функциональных областей
  */
 
-  const roomsField = tabswidget({
+  const roomsField       = tabswidget({
     parent: roomsBox,
     style: {
       selected: {
@@ -142,7 +154,7 @@ process.on('SIGWINCH', () => {
     }
   });
 
-  const chatField = blessed.log({
+  const chatField        = blessed.log({
     parent: chatBox,
     height: '100%-3',
     mouse:  true,
@@ -155,7 +167,7 @@ process.on('SIGWINCH', () => {
     }
   });
 
-  const typingField = blessed.box({
+  const typingField      = blessed.box({
     parent: chatBox,
     height: 1,
     bottom: 0,
@@ -165,7 +177,7 @@ process.on('SIGWINCH', () => {
     }
   });
 
-  const onlineField = blessed.list({
+  const onlineField      = blessed.list({
     parent:      onlineBox,
     interactive: false,
     padding: {
@@ -174,7 +186,7 @@ process.on('SIGWINCH', () => {
     }
   });
 
-  const inputField = blessed.textarea({
+  const inputField       = blessed.textarea({
     parent:       inputBox,
     inputOnFocus: true,
     padding: {
@@ -183,7 +195,7 @@ process.on('SIGWINCH', () => {
     }
   });
 
-  const dialogDescField = blessed.box({
+  const dialogDescField  = blessed.box({
     parent: dialogBox,
     height: 1,
     top:    0,
@@ -201,26 +213,23 @@ process.on('SIGWINCH', () => {
     }
   });
 
-const dialogHintField = blessed.box({
-  parent: dialogBox,
-  height: 2,
-  bottom: 0,
-  align:  'center'
-});
+  const dialogHintField  = blessed.box({
+    parent: dialogBox,
+    height: 2,
+    bottom: 0,
+    align:  'center'
+  });
 
-window.append(roomsBox);
-window.append(chatBox);
-window.append(onlineBox);
-window.append(inputBox);
-window.append(warningBox);
-window.append(dialogBox);
+screen.append(window);
 
 warningBox.hide();
 dialogBox.hide();
 
-window.render();
+screen.render();
 
 inputField.focus();
+
+
 
 /**
  * Определение горячих клавиш
@@ -229,7 +238,7 @@ inputField.focus();
   inputField.key('escape', () => {
     inputField.focus();
     inputField.clearValue();
-    window.render()
+    screen.render()
   });
 
   inputField.key(['C-c'], () => {
@@ -256,12 +265,12 @@ inputField.focus();
 
   inputField.key(['C-left'], () => {
     roomsField.moveAndSelectLeft();
-    window.render()
+    screen.render()
   });
 
   inputField.key(['C-right'], () => {
     roomsField.moveAndSelectRight();
-    window.render()
+    screen.render()
   });
 
   inputField.key('enter', () => {
@@ -271,7 +280,7 @@ inputField.focus();
         history[room.target] = [];
         chatField.setContent('');
         hlog(room.target, gold('Ваш чат был очищен.'));
-        window.render()
+        screen.render()
       }
 
       if (input.startsWith('/re ')) {
@@ -296,7 +305,7 @@ inputField.focus();
       selectedMessage = myMessages.length
     } else {
       inputField.clearValue();
-      window.render()
+      screen.render()
     }
   });
 
@@ -305,7 +314,7 @@ inputField.focus();
       inputField.setValue(myMessages[--selectedMessage])
     };
 
-    window.render()
+    screen.render()
   });
 
   inputField.key('down', () => {
@@ -318,17 +327,17 @@ inputField.focus();
       selectedMessage = myMessages.length
     };
 
-    window.render()
+    screen.render()
   });
 
   inputField.key(['C-up'], () => {
     chatField.scroll(-1);
-    window.render()
+    screen.render()
   });
 
   inputField.key(['C-down'], () => {
     chatField.scroll(1);
-    window.render()
+    screen.render()
   });
 
 
@@ -336,7 +345,7 @@ inputField.focus();
   dialogInputField.key('escape', () => {
     dialogInputField.focus();
     dialogInputField.clearValue();
-    window.render()
+    screen.render()
   });
 
   dialogInputField.key(['C-c'], () => {
@@ -351,27 +360,12 @@ inputField.focus();
       callDialogBox(0)
     } else {
       if (dialogBox.type == 1) {
-        chat.createRoom(input, (success, err) => {
+        chat.createRoom(input, (success, errobj) => {
           if (success) {
             callDialogBox(0);
             return true
           } else {
-            if (err.code == errorcode.invalid_target) {
-              dialogHintField.setContent(red('Недопустимое название комнаты.'))
-            }
-
-            else if (err.code == errorcode.already_exists) {
-              dialogHintField.setContent(red('Комната с таким названием уже существует.'))
-            }
-
-            else if (err.code == errorcode.access_denied && !isAuthorized) {
-              dialogHintField.setContent(red('Для создания комнаты необходимо авторизироваться.'))
-            } else {
-              dialogHintField.setContent(red(`Неизвестная ошибка (${err.code}).`))
-            };
-
-            dialogInputField.clearValue();
-            window.render()
+            setDialogBoxError(errobj)
           }
         })
       }
@@ -384,19 +378,7 @@ inputField.focus();
               callDialogBox(0);
               return true
             } else {
-              if (roomobj.code == errorcode.already_connected) {
-                dialogHintField.setContent(red('Вы уже подключены к данной комнате.'))
-              }
-
-              else if (roomobj.code == errorcode.not_found) {
-                dialogHintField.setContent(red('Такой комнаты не существует.'))
-              }
-
-              else {
-                dialogHintField.setContent(red(`Неизвестная ошибка (${roomobj.code}).`))
-              };
-
-              window.render()
+              setDialogBoxError(roomobj)
             }
           },
           autoLogin: true,
@@ -410,19 +392,13 @@ inputField.focus();
         if (input != room.target) {
           dialogInputField.clearValue();
           dialogHintField.setContent(red('Для удаления комнаты вы должны находится в ней.'));
-          window.render()
+          screen.render()
         } else {
-          chat.removeRoom(input, (success, err) => {
+          chat.removeRoom(input, (success, errobj) => {
             if (success) {
               callDialogBox(0)
             } else {
-              if (err.code == errorcode.access_denied) {
-                dialogHintField.setContent(red('Вы не являетесь создателем комнаты.'))
-              } else {
-                dialogHintField.setContent(red(`Неизвестная ошибка (${err.code}).`))
-              };
-
-              window.render()
+              setDialogBoxError(errobj)
             }
           })
         }
@@ -435,7 +411,7 @@ inputField.focus();
   warningBox.on('keypress', () => {
     warningBox.hide();
     inputField.focus();
-    window.render()
+    screen.render()
   });
 
 /**
@@ -457,6 +433,8 @@ inputField.focus();
 
   function callDialogBox(type) {
     /**
+     * Вызов диалога
+     *
      * 0 - обнулить свойства диалога и скрыть его
      * 1 - диалог создания новой комнаты
      * 2 - диалог подключения к комнате
@@ -498,17 +476,61 @@ inputField.focus();
       inputField.cancel();
       dialogBox.show();
       dialogInputField.focus();
-      window.render()
+      screen.render()
     } else {
       dialogInputField.cancel();
       dialogBox.hide();
       inputField.focus();
-      window.render();
+      screen.render()
     }
   };
 
+  function setDialogBoxError(errobj) {
+    switch(errobj.code) {
+      case errorcode.unknown:
+        dialogHintField.setContent(red('Неизвестная ошибка.'))
+      break;
+
+      case errorcode.database_error:
+        dialogHintField.setContent(red('Ошибка при подключении к базе данных.'))
+      break;
+
+      case errorcode.already_connected:
+        dialogHintField.setContent(red('Вы уже подключены к данной комнате.'))
+      break;
+
+      case errorcode.not_found:
+        dialogHintField.setContent(red('Такой комнаты не существует.'))
+      break;
+
+      case errorcode.access_denied:
+        if (dialogBox.type == 1) {
+          dialogHintField.setContent(red('Авторизируйтесь для создания комнаты.'))
+        }
+
+        else if (dialogBox.type == 3) {
+          dialogHintField.setContent(red('Вы не являетесь создателем данной комнаты.'))
+        }
+      break;
+
+      case errorcode.invalid_target:
+        dialogHintField.setContent(red('Некорректное название комнаты.'))
+      break;
+
+      case errorcode.already_exists:
+        dialogHintField.setContent(red('Комната с таким названием уже существует.'))
+      break;
+
+      default:
+        dialogHintField.setContent(red(`Неизвестная ошибка: (${errobj.code}).`))
+    };
+
+    dialogInputField.clearValue();
+    screen.render()
+  }
+
   function roomChanged() {
-    window.title = 'wschatclient - ' + room.target;
+    screen.title = 'wschatclient - ' + room.target;
     chatField.setContent('');
     updateOnlineList();
 
@@ -516,7 +538,7 @@ inputField.focus();
       log(history[room.target][i])
     };
 
-    window.render();
+    screen.render()
   };
 
   function updateRoomsList() {
@@ -538,7 +560,7 @@ inputField.focus();
     for (let i in room.getMembers()) {
       let user = room.getMembers()[i];
 
-      let userColor = chalk.hex(helper.hexifyColor(user.color)).bold;
+      let userColor = chalk.hex(hexifyColor(user.color)).bold;
 
       if (user.status == 2) {
         onlineField.insertItem(0, (gold('* ') + userColor(user.name)))
@@ -549,7 +571,7 @@ inputField.focus();
       }
     }
 
-    window.render()
+    screen.render()
   };
 
   function updateTypingList() {
@@ -564,7 +586,18 @@ inputField.focus();
 
       typingUsers.length > 0 ? typingField.setContent(gray(typingUsers[0].name) + gray(typingUsers.length < 2 ? ' печатает...' : ' и другие печатают...')) : typingField.setContent('')
     }
-  }
+  };
+
+  function hexifyColor(value) {
+    return {
+      'aquamarine': '#7FFFD4',
+      'deeppink':   '#FF1493',
+      'dodgerblue': '#1E90FF',
+      'gray':       '#808080'
+    }
+
+    [value] || value
+  };
 
 /**
  * Обработка событий в чате
@@ -589,7 +622,7 @@ inputField.focus();
           inputField.cancel();
           warningBox.show();
           warningBox.focus();
-          window.render();
+          screen.render();
         }
       })
     };
@@ -603,10 +636,11 @@ inputField.focus();
           inputField.cancel();
           warningBox.show();
           warningBox.focus();
-          window.render()
+          screen.render()
         }
       })
-    }
+    };
+
     chat.joinRoom({
       target: '#chat',
       autoLogin: true,
@@ -638,7 +672,7 @@ inputField.focus();
     };
 
     history[roomobj.target] = [];
-    window.render()
+    screen.render()
   };
 
   chat.onRoomCreated = function(ntarget) {
@@ -650,30 +684,25 @@ inputField.focus();
   }
 
   chat.onMessage = function(room, msgobj) {
-    let htarget = msgobj.target;
+    let target = msgobj.target;
 
-    let userColor = chalk.hex(helper.hexifyColor(msgobj.color)).bold;
+    let userColor = chalk.hex(hexifyColor(msgobj.color)).bold;
     let message = msgobj.message.replace(/https?:\/\/[^\s"']+/g, chalk.hex('#9797FF')('$&'));
 
     if (msgobj.style == messagestyle.message && msgobj.to == 0) {
-      let content = (userColor(msgobj.from_login, ': ') + message).replace(' :', ':');
-      hlog(htarget, content)
+      hlog(target, (userColor(msgobj.from_login, ': ') + message).replace(' :', ':'))
     };
 
     if (msgobj.style == messagestyle.me) {
-      let content = gray('* ') + userColor(msgobj.from_login, '') + white(message);
-      hlog(htarget, content)
+      hlog(target, gray('* ') + userColor(msgobj.from_login, '') + white(message))
     };
 
     if (msgobj.style == messagestyle.event) {
-      let content = gray('* ') + white(message);
-      hlog(htarget, content)
+      hlog(target, gray('* ') + white(message))
     };
 
     if (msgobj.style == messagestyle.offtop) {
-      let message = msgobj.message.replace(/https?:\/\/[^\s"']+/g, chalk.hex('#9797FF')('$&'));
-      let content = (userColor(msgobj.from_login, ': ') + chalk.hex('#808080')('((', message, '))')).replace(' :', ':');
-      hlog(htarget, content)
+      hlog(target, (userColor(msgobj.from_login, ': ') + chalk.hex('#808080')('((', message, '))')).replace(' :', ':'))
     };
 
     if (msgobj.to != 0) {
@@ -681,32 +710,31 @@ inputField.focus();
         lastPMSender = msgobj.from
       };
 
-      let toUserColor = chalk.hex(helper.hexifyColor(room.getMemberById(msgobj.to).color)).bold;
+      let toUserColor = chalk.hex(hexifyColor(room.getMemberById(msgobj.to).color)).bold;
 
-      let content = (gray('(лс) ') + userColor(msgobj.from_login) + gray(' > ') + toUserColor(room.getMemberById(msgobj.to).name, ': ') + white(message)).replace(' :', ':');
-      hlog(htarget, content)
-    }
+      hlog(target, (gray('(лс) ') + userColor(msgobj.from_login) + gray(' > ') + toUserColor(room.getMemberById(msgobj.to).name, ': ') + white(message)).replace(' :', ':'))
+    };
 
-    window.render()
+    screen.render()
   };
 
   chat.onUserStatusChanged = function(room, userobj) {
-    let htarget = userobj.target;
+    let target = userobj.target;
 
     if (userobj.name != '') {
       if (userobj.status == userstatus.nick_change) {
         let content = userobj.girl ? skyblue(userobj.data) + gold(' сменила никнейм на ') + skyblue(userobj.name) : skyblue(userobj.data) + gold(' сменил никнейм на ') + skyblue(userobj.name)
-        hlog(htarget, content)
+        hlog(target, content)
       };
 
       if (userobj.status == userstatus.gender_change) {
         let content = userobj.girl ? skyblue(userobj.name) + gold(' сменил пол на ') + skyblue('женский') : skyblue(userobj.name) + gold(' сменила пол на ') + skyblue('мужской')
-        hlog(htarget, content)
+        hlog(target, content)
       };
 
       if (userobj.status == userstatus.color_change) {
         let content = userobj.girl ? skyblue(userobj.name) + gold(' сменила ') + chalk.hex(userobj.color).bold('цвет') : skyblue(userobj.name) + gold(' сменил ') + chalk.hex(userobj.color).bold('цвет')
-        hlog(htarget, content)
+        hlog(target, content)
       };
 
       if (userobj.status == userstatus.typing || userobj.status == userstatus.stop_typing) {
@@ -731,16 +759,16 @@ inputField.focus();
 
   chat.onSysMessage = function(roomobj, msg) {
     hlog(room.target, gold(msg));
-    window.render()
+    screen.render()
   };
 
-  window.on('focus', () => {
+  screen.on('focus', () => {
     if (isOpened) {
       chat.changeStatus(7)
     }
   });
 
-  window.on('blur', () => {
+  screen.on('blur', () => {
     if (isOpened) {
       chat.changeStatus(3)
     }
