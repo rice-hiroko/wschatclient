@@ -1,43 +1,41 @@
 'use strict';
 
-const wschat  = require('wschatapi');
-const chalk   = require('chalk');
+const wschat = require('wschatapi');
+const chalk = require('chalk');
 const blessed = require('blessed');
-
-const config     = require('./config');
+const config = require('./config');
 const tabswidget = require('./lib/widgets/tabs');
-
 const Timer = require('./lib/timer');
 
 const chat = new wschat('wss://sinair.ru/ws/chat');
 
 chat.open();
 
-const errorcode    = wschat.ErrorCode;
+const errorcode = wschat.ErrorCode;
 const messagestyle = wschat.MessageStyle;
-const userstatus   = wschat.UserStatus;
+const userstatus = wschat.UserStatus;
 
-const userlogin    = config.Authorization.Login;
+const userlogin = config.Authorization.Login;
 const userpassword = config.Authorization.Password;
-const userapikey   = config.Authorization.APIKey;
+const userapikey = config.Authorization.APIKey;
 
-let isOpened        = false;
-let isAuthorized    = false;
-let room            = null;
-let history         = {};
-let lastPMSender    = 0;
-let myMessages      = [];
+let isOpened = false;
+let isAuthorized = false;
+let room = null;
+let history = {};
+let lastPMSender = 0;
+let myMessages = [];
 let selectedMessage = myMessages.length;
 
 let timerTyping = new Timer(() => {
   setTyping(false)
 });
 
-const white   = chalk.white;
-const gray    = chalk.hex('#808080').bold;
-const gold    = chalk.hex('#FFD700').bold;
+const white = chalk.white;
+const gray = chalk.hex('#808080').bold;
+const gold = chalk.hex('#FFD700').bold;
 const skyblue = chalk.hex('#87CEEB').bold;
-const red     = chalk.hex('#FF6666').bold;
+const red = chalk.hex('#FF6666').bold;
 
 const screen = blessed.screen({
   smartCSR: true,
@@ -55,48 +53,46 @@ process.on('SIGWINCH', () => {
   screen.emit('resize')
 });
 
-
-
 /**
  * Определение простых областей
  */
-  const roomsBox   = blessed.box({
+  const roomsBox = blessed.box({
     parent: window,
-    label:  'Комнаты',
-    width:  '100%',
+    label: 'Комнаты',
+    width: '100%',
     height: 3,
     border: {
       type: 'line'
     }
   });
 
-  const chatBox    = blessed.box({
+  const chatBox = blessed.box({
     parent: window,
-    label:  'Чат',
-    width:  '70%',
+    label: 'Чат',
+    width: '70%',
     height: '100%-6',
-    top:    3,
+    top: 3,
     border: {
       type: 'line'
     }
   });
 
-  const onlineBox  = blessed.box({
+  const onlineBox = blessed.box({
     parent: window,
-    label:  'В комнате',
-    width:  '30%',
+    label: 'В комнате',
+    width: '30%',
     height: '100%-6',
-    top:    3,
-    right:  0,
+    top: 3,
+    right: 0,
     border: {
       type: 'line'
     }
   });
 
-  const inputBox   = blessed.box({
+  const inputBox = blessed.box({
     parent: window,
-    label:  'Ваше сообщение',
-    width:  '100%',
+    label: 'Ваше сообщение',
+    width: '100%',
     height: 3,
     bottom: 0,
     border: {
@@ -105,29 +101,29 @@ process.on('SIGWINCH', () => {
   });
 
   const warningBox = blessed.box({
-    parent:       window,
-    width:        39,
-    height:       7,
-    top:          'center',
-    left:         'center',
-    align:        'center',
+    parent: window,
+    width: 39,
+    height: 7,
+    top: 'center',
+    left: 'center',
+    align: 'center',
     inputOnFocus: true,
-    padding:      1,
+    padding: 1,
     border: {
       type: 'line',
-      fg:   '#F88'
+      fg: '#F88'
     }
   });
 
-  const dialogBox  = blessed.box({
+  const dialogBox = blessed.box({
     parent: window,
-    width:  39,
+    width: 39,
     height: 9,
-    top:    'center',
-    left:   'center',
+    top: 'center',
+    left: 'center',
     padding: {
-      top:   1,
-      left:  1,
+      top: 1,
+      left: 1,
       right: 1
     },
     border: {
@@ -139,33 +135,31 @@ process.on('SIGWINCH', () => {
     }
   });
 
-
-
 /**
  * Определение функциональных областей
  */
 
-  const roomsField       = tabswidget({
+  const roomsField = tabswidget({
     parent: roomsBox,
     style: {
       selected: {
-        fg:      'white',
-        bold:    true,
+        fg: 'white',
+        bold: true,
         inverse: true
       },
       item: {
-        fg:   'white',
+        fg: 'white',
         bold: true
       }
     }
   });
 
-  const chatField        = blessed.log({
+  const chatField = blessed.log({
     parent: chatBox,
     height: '100%-3',
-    mouse:  true,
+    mouse: true,
     padding: {
-      left:  1,
+      left: 1,
       right: 1
     },
     style: {
@@ -173,57 +167,57 @@ process.on('SIGWINCH', () => {
     }
   });
 
-  const typingField      = blessed.box({
+  const typingField = blessed.box({
     parent: chatBox,
     height: 1,
     bottom: 0,
     padding: {
-      left:  1,
+      left: 1,
       right: 1
     }
   });
 
-  const onlineField      = blessed.list({
-    parent:      onlineBox,
+  const onlineField = blessed.list({
+    parent: onlineBox,
     interactive: false,
     padding: {
-      left:  1,
+      left: 1,
       right: 1
     }
   });
 
-  const inputField       = blessed.textarea({
-    parent:       inputBox,
+  const inputField = blessed.textarea({
+    parent: inputBox,
     inputOnFocus: true,
     padding: {
-      left:  1,
+      left: 1,
       right: 1
     }
   });
 
-  const dialogDescField  = blessed.box({
+  const dialogDescField = blessed.box({
     parent: dialogBox,
     height: 1,
-    top:    0,
-    align:  'center'
+    top: 0,
+    align: 'center'
   });
 
   const dialogInputField = blessed.textarea({
-    parent:       dialogBox,
+    parent: dialogBox,
+    height: 1,
+    top: 2,
     inputOnFocus: true,
-    height:       1,
-    top:          2,
     style: {
-      bold:    true,
+      bold: true,
       inverse: true
     }
   });
 
-  const dialogHintField  = blessed.box({
+  const dialogHintField = blessed.box({
     parent: dialogBox,
     height: 2,
     bottom: 0,
-    align:  'center'
+    align: 'center'
   });
 
 screen.append(window);
@@ -234,8 +228,6 @@ dialogBox.hide();
 screen.render();
 
 inputField.focus();
-
-
 
 /**
  * Определение горячих клавиш
@@ -262,7 +254,7 @@ inputField.focus();
 
   inputField.key(['C-r'], () => {
     callDialogBox(3)
-  })
+  });
 
   inputField.key(['C-q'], () => {
     if (room != null) {
@@ -284,7 +276,7 @@ inputField.focus();
     setTyping(false);
 
     let input = inputField.getValue().replace('\n', '');
-    if (input != '') {
+    if (room != null && input != '') {
       if (input == '/clear') {
         history[room.target] = [];
         chatField.setContent('');
@@ -369,7 +361,6 @@ inputField.focus();
         }
   });
 
-
   dialogInputField.key('escape', () => {
     dialogInputField.focus();
     dialogInputField.clearValue();
@@ -417,24 +408,26 @@ inputField.focus();
       }
 
       else if (dialogBox.type == 3) {
-        if (input != room.target) {
-          dialogInputField.clearValue();
-          dialogHintField.setContent(red('Для удаления комнаты вы должны находится в ней.'));
-          screen.render()
+        if (room != null) {
+          if (input != room.target) {
+            dialogInputField.clearValue();
+            dialogHintField.setContent(red('Для удаления комнаты вы должны находится в ней.'));
+            screen.render()
+          } else {
+            chat.removeRoom(input, (success, errobj) => {
+              if (success) {
+                callDialogBox(0)
+              } else {
+                setDialogBoxError(errobj)
+              }
+            })
+          }
         } else {
-          chat.removeRoom(input, (success, errobj) => {
-            if (success) {
-              callDialogBox(0)
-            } else {
-              setDialogBoxError(errobj)
-            }
-          })
+          callDialogBox(0)
         }
       }
     }
   });
-
-
 
   warningBox.on('keypress', () => {
     warningBox.hide();
@@ -453,7 +446,7 @@ inputField.focus();
   function hlog(rname, text) {
     if (room.target == rname) {
       chatField.pushLine(text)
-    }
+    };
 
     history[rname] = history[rname] || [];
     history[rname].push(text)
@@ -628,8 +621,8 @@ inputField.focus();
   };
 
   function setTyping(value) {
-    if (value){
-      if (!timerTyping.started){
+    if (value) {
+      if (!timerTyping.started) {
         sendTyping(true)
       }
       timerTyping.start(5)
@@ -640,11 +633,10 @@ inputField.focus();
   };
 
   function sendTyping(value) {
-    if (room != null && room.getMyMemberNick() != ''){
+    if (room != null && room.getMyMemberNick() != '') {
       room.changeStatus(value ? userstatus.typing : userstatus.stop_typing)
     }
   };
-
 
 /**
  * Обработка событий в чате
@@ -712,6 +704,7 @@ inputField.focus();
         updateRoomsList()
       }
     } else {
+      screen.title = 'wschatclient';
       chatField.setContent('');
       onlineField.clearItems();
       roomsField.clearItems();
@@ -811,12 +804,12 @@ inputField.focus();
 
   screen.on('focus', () => {
     if (isOpened) {
-      chat.changeStatus(7)
+      chat.changeStatus(userstatus.back)
     }
   });
 
   screen.on('blur', () => {
     if (isOpened) {
-      chat.changeStatus(3)
+      chat.changeStatus(userstatus.away)
     }
   })
