@@ -3,8 +3,8 @@
 const wschat = require('wschatapi');
 const chalk = require('chalk');
 const blessed = require('blessed');
+const notifier = require('node-notifier');
 const config = require('./config');
-const tabswidget = require('./lib/widgets/tabs');
 const Timer = require('./lib/timer');
 
 const chat = new wschat('wss://sinair.ru/ws/chat');
@@ -15,15 +15,20 @@ const errorcode = wschat.ErrorCode;
 const messagestyle = wschat.MessageStyle;
 const userstatus = wschat.UserStatus;
 
-const userlogin = config.Authorization.Login;
-const userpassword = config.Authorization.Password;
-const userapikey = config.Authorization.APIKey;
+let settings = {
+  login: config.Authorization.Login,
+  password: config.Authorization.Password,
+  apikey: config.Authorization.APIKey,
+  popupnotifier: config.Settings.PopupNotifier,
+  soundnotifier: config.Settings.SoundNotifier
+};
 
 let isOpened = false;
 let isAuthorized = false;
+let isFocused = false;
 let room = null;
-let history = {};
-let lastPMSender = 0;
+let chats = {};
+let lastPMFrom = 0;
 let myMessages = [];
 let selectedMessage = myMessages.length;
 
@@ -72,6 +77,10 @@ process.on('SIGWINCH', () => {
     width: '70%',
     height: '100%-6',
     top: 3,
+    padding: {
+      left: 1,
+      right: 1
+    },
     border: {
       type: 'line'
     }
@@ -84,6 +93,10 @@ process.on('SIGWINCH', () => {
     height: '100%-6',
     top: 3,
     right: 0,
+    padding: {
+      left: 1,
+      right: 1
+    },
     border: {
       type: 'line'
     }
@@ -95,6 +108,10 @@ process.on('SIGWINCH', () => {
     width: '100%',
     height: 3,
     bottom: 0,
+    padding: {
+      left: 1,
+      right: 1
+    },
     border: {
       type: 'line'
     }
@@ -135,11 +152,56 @@ process.on('SIGWINCH', () => {
     }
   });
 
+  const settingsBox = blessed.box({
+    parent: window,
+    label: 'Настройки',
+    width: 49,
+    height: 6,
+    top: 'center',
+    left: 'center',
+    padding: 1,
+    border: {
+      type: 'line'
+    }
+  })
+
+  const helpBox = blessed.box({
+    parent: window,
+    label: 'Помощь',
+    width: 58,
+    height: 20,
+    top: 'center',
+    left: 'center',
+    content:
+    gold('Ctrl + E') + '                       ' + gold('Ctrl + Up') + '\n' +
+    ' - подключиться к комнате       - история чата вверх\n' +
+    gold('Ctrl + Q') + '                       ' + gold('Ctrl + Down') + '\n' +
+    ' - отключиться от комнаты       - история чата вниз\n' +
+    gold('Ctrl + N') + '                       ' + gold('Ctrl + Left') + '\n' +
+    ' - создать комнату              - предыдущая комната\n' +
+    gold('Ctrl + R') + '                       ' + gold('Ctrl + Right') + '\n' +
+    ' - удалить комнату              - следующая комната\n\n' +
+    gold('Ctrl + S') + '                       ' + gold('Up') + '\n' +
+    ' - открыть меню настроек        - предыдущее сообщение\n' +
+    gold('Ctrl + C') + '                       ' + gold('Down') + '\n' +
+    ' - закрыть диалог или клиент    - следующее сообщение\n' +
+    gold('Escape') + '                         ' + gold('Enter') + '\n' +
+    ' - очистить поле ввода          - отправить сообщение',
+    padding: {
+      top: 1,
+      left: 1,
+      right: 1
+    },
+    border: {
+      type: 'line'
+    }
+  });
+
 /**
  * Определение функциональных областей
  */
 
-  const roomsField = tabswidget({
+  const roomsField = blessed.tabs({
     parent: roomsBox,
     style: {
       selected: {
@@ -154,44 +216,38 @@ process.on('SIGWINCH', () => {
     }
   });
 
-  const chatField = blessed.log({
-    parent: chatBox,
-    height: '100%-3',
-    mouse: true,
-    padding: {
-      left: 1,
-      right: 1
-    },
-    style: {
-      fg: 'white'
-    }
-  });
-
   const typingField = blessed.box({
     parent: chatBox,
     height: 1,
-    bottom: 0,
-    padding: {
-      left: 1,
-      right: 1
-    }
+    bottom: 0
   });
 
   const onlineField = blessed.list({
     parent: onlineBox,
-    interactive: false,
-    padding: {
-      left: 1,
-      right: 1
-    }
+    interactive: false
   });
 
   const inputField = blessed.textarea({
     parent: inputBox,
-    inputOnFocus: true,
-    padding: {
-      left: 1,
-      right: 1
+    inputOnFocus: true
+  });
+
+  const settingsField = blessed.list({
+    parent: settingsBox,
+    items: [
+      'Звуковые уведомления при сообщении:     ' + (settings.soundnotifier ? 'вкл.' : 'выкл.'), // 0
+      'Графические уведомления при упоминании: ' + (settings.popupnotifier ? 'вкл.' : 'выкл.')  // 1
+    ],
+    style: {
+      selected: {
+        fg: 'white',
+        bold: true,
+        inverse: true
+      },
+      item: {
+        fg: 'white',
+        bold: true
+      }
     }
   });
 
@@ -220,8 +276,17 @@ process.on('SIGWINCH', () => {
     align: 'center'
   });
 
+helpBox.append(blessed.box({
+  height: 1,
+  bottom: 0,
+  align: 'center',
+  content: gold('wschatclient@2.0.0 with <3 by helix')
+}))
+
 screen.append(window);
 
+helpBox.hide();
+settingsBox.hide();
 warningBox.hide();
 dialogBox.hide();
 
@@ -262,6 +327,20 @@ inputField.focus();
     }
   });
 
+  inputField.key(['C-g'], () => {
+    inputField.cancel();
+    helpBox.show();
+    helpBox.focus();
+    screen.render()
+  });
+
+  inputField.key(['C-s'], () => {
+    inputField.cancel();
+    settingsBox.show();
+    settingsField.focus();
+    screen.render()
+  });
+
   inputField.key(['C-left'], () => {
     roomsField.moveAndSelectLeft();
     screen.render()
@@ -278,22 +357,30 @@ inputField.focus();
     let input = inputField.getValue().replace('\n', '');
     if (room != null && input != '') {
       if (input == '/clear') {
-        history[room.target] = [];
-        chatField.setContent('');
-        hlog(room.target, gold('Ваш чат был очищен.'));
+        chats[room.target].setContent('');
+        rlog(room.target, gold('Ваш чат был очищен.'));
         screen.render()
       }
 
-      if (input.startsWith('/re ')) {
-        if (lastPMSender != 0) {
-          let message = input.replace('/re ', '');
-          room.sendMessage(`/umsg ${lastPMSender} ${message}`)
+      if (input == '/help') {
+        rlog(room.target,
+        skyblue(''))
+      }
+
+      if (input.startsWith('/re')) {
+        if (input == '/re' || input == '/re ') {
+          rlog(room.target, gold('Вы забыли написать текст сообщения :('))
         } else {
-          hlog(room.target, gold('Вам еще никто не писал в ЛС.'))
+          if (lastPMFrom != 0) {
+            let message = input.replace('/re ', '');
+            room.sendMessage(`/umsg ${lastPMFrom} ${message}`)
+          } else {
+            rlog(room.target, gold('Вам еще никто не писал в ЛС.'))
+          }
         }
       }
 
-      else if (roomsField.ritems.length > 0) {
+      else if (!input.startsWith('/re ') && input != '/clear' && roomsField.ritems.length > 0) {
         room.sendMessage(input)
       };
 
@@ -332,13 +419,17 @@ inputField.focus();
   });
 
   inputField.key(['C-up'], () => {
-    chatField.scroll(-1);
-    screen.render()
+    if (room != null) {
+      chats[room.target].scroll(-1);
+      screen.render()
+    }
   });
 
   inputField.key(['C-down'], () => {
-    chatField.scroll(1);
-    screen.render()
+    if (room != null) {
+      chats[room.target].scroll(1);
+      screen.render()
+    }
   });
 
   inputField.key('backspace', () => {
@@ -359,6 +450,36 @@ inputField.focus();
         !key.ctrl) {
           setTyping(true)
         }
+  });
+
+  settingsField.key(['C-c', 'escape', 'C-s'], () => {
+    settingsBox.hide();
+    inputField.focus();
+    screen.render()
+  });
+
+  settingsField.key(['down'], () => {
+    settingsField.down(1);
+    screen.render()
+  });
+
+  settingsField.key(['up'], () => {
+    settingsField.up(1);
+    screen.render()
+  });
+
+  settingsField.key('enter', () => {
+    if (settingsField.selected == 0) {
+      settings.soundnotifier = settings.soundnotifier ? false : true;
+      settingsField.items[0].content = 'Звуковые уведомления при сообщении:     ' + (settings.soundnotifier ? 'вкл.' : 'выкл.');
+      screen.render()
+    };
+
+    if (settingsField.selected == 1) {
+      settings.popupnotifier = settings.popupnotifier ? false : true;
+      settingsField.items[1].content = 'Графические уведомления при упоминании: ' + (settings.popupnotifier ? 'вкл.' : 'выкл.');
+      screen.render()
+    }
   });
 
   dialogInputField.key('escape', () => {
@@ -435,21 +556,18 @@ inputField.focus();
     screen.render()
   });
 
+  helpBox.on('keypress', () => {
+    helpBox.hide();
+    inputField.focus();
+    screen.render()
+  });
+
 /**
  * Определение функций
  */
 
-  function log(text) {
-    chatField.pushLine(text)
-  };
-
-  function hlog(rname, text) {
-    if (room.target == rname) {
-      chatField.pushLine(text)
-    };
-
-    history[rname] = history[rname] || [];
-    history[rname].push(text)
+  function rlog(rname, text) {
+    chats[rname].pushLine(text)
   };
 
   function callDialogBox(type) {
@@ -540,7 +658,6 @@ inputField.focus();
 
       case errorcode.already_exists:
         dialogHintField.setContent(red('Комната с таким названием уже существует.'))
-      break;
 
       default:
         dialogHintField.setContent(red(`Неизвестная ошибка: (${errobj.code}).`))
@@ -548,16 +665,13 @@ inputField.focus();
 
     dialogInputField.clearValue();
     screen.render()
-  }
+  };
 
   function roomChanged() {
-    screen.title = 'wschatclient - ' + room.target;
-    chatField.setContent('');
+    screen.title = `wschatclient - ${room.target}`;
+    chats[room.target].show();
     updateOnlineList();
-
-    for (let i in history[room.target]) {
-      log(history[room.target][i])
-    };
+    updateTypingList();
 
     screen.render()
   };
@@ -567,6 +681,10 @@ inputField.focus();
 
     for (let i in chat.rooms) {
       roomsField.addItem(chat.rooms[i].target, () => {
+        if (room != null) {
+          chats[room.target].hide();
+        };
+
         room = chat.rooms[i];
         roomChanged()
       })
@@ -583,14 +701,14 @@ inputField.focus();
 
       let userColor = chalk.hex(hexifyColor(user.color)).bold;
 
-      if (user.status == 2) {
+      if (user.status == userstatus.online) {
         onlineField.insertItem(0, (gold('* ') + userColor(user.name)))
       }
 
-      else if (user.status == 3) {
+      else if (user.status == userstatus.away) {
         onlineField.insertItem(0, (gray('* ') + userColor(user.name)))
       }
-    }
+    };
 
     screen.render()
   };
@@ -603,10 +721,10 @@ inputField.focus();
 
       if (user.typing && user.name != room.getMyMemberNick()) {
         typingUsers.push(user)
-      };
+      }
+    };
 
-      typingUsers.length > 0 ? typingField.setContent(gray(typingUsers[0].name) + gray(typingUsers.length < 2 ? ' печатает...' : ' и другие печатают...')) : typingField.setContent('')
-    }
+    typingUsers.length > 0 ? typingField.setContent(gray(typingUsers[0].name) + gray(typingUsers.length < 2 ? ' печатает...' : ' и другие печатают...')) : typingField.setContent('')
   };
 
   function hexifyColor(value) {
@@ -618,6 +736,23 @@ inputField.focus();
     }
 
     [value] || value
+  };
+
+  function processMessage(message) {
+    let urlRegexp = /https?:\/\/[^\s"']+/g;
+    let quoteRegexp = /^> (?:([\s\S]+?)(?:\n^$\n?)|([\s\S]+)$)/mg;
+      if (message.startsWith('> ')) {
+        message = message.replace('>', '\n>')
+      };
+
+      message = message.replace(urlRegexp, chalk.hex('#9797FF')('$&'));
+      message = message.replace(quoteRegexp, chalk.hex('#EEEE88')('$&'));
+
+      if (message.indexOf('> ') != -1) {
+        message = message.replace(/\n\n/g, '\n')
+      };
+
+      return message
   };
 
   function setTyping(value) {
@@ -638,13 +773,19 @@ inputField.focus();
     }
   };
 
+  function soundNotify() {
+    if (settings.soundnotifier && !isFocused) {
+      process.stdout.write('\x07')
+    }
+  };
+
 /**
  * Обработка событий в чате
  */
 
   chat.onOpen = function() {
-    if (userlogin != '' && userpassword != '' && !isAuthorized) {
-      chat.authByLoginAndPassword(userlogin, userpassword, (success, userinfo) => {
+    if (settings.login != '' && settings.password != '' && !isAuthorized) {
+      chat.authByLoginAndPassword(settings.login, settings.password, (success, userinfo) => {
         if (success) {
           isAuthorized = true
         } else {
@@ -666,8 +807,8 @@ inputField.focus();
       })
     };
 
-    if (userapikey != '' && !isAuthorized) {
-      chat.authByApiKey(userapikey, (success, userinfo) => {
+    if (settings.apikey != '' && !isAuthorized) {
+      chat.authByApiKey(settings.apikey, (success, userinfo) => {
         if (userinfo.user_id != 0) {
           isAuthorized = true
         } else {
@@ -681,7 +822,7 @@ inputField.focus();
     };
 
     chat.joinRoom({
-      target: '#chat',
+      target: '#wschatclient-dev',
       autoLogin: true,
       loadHistory: true
     });
@@ -690,11 +831,25 @@ inputField.focus();
   };
 
   chat.onJoinedRoom = function(roomobj) {
+    chats[roomobj.target] = chats[roomobj.target] || blessed.log({
+      parent: chatBox,
+      height: '100%-3',
+      mouse: true,
+      style: {
+        fg: 'white'
+      }
+    });
+
+    if (room != null) {
+      chats[room.target].hide()
+    };
+
     room = roomobj;
     updateRoomsList()
   };
 
   chat.onLeaveRoom = function(roomobj) {
+    chats[room.target].setContent('');
     if (roomsField.ritems.length > 1) {
       if (roomsField.ritems.indexOf(room.getTarget()) == 0) {
         roomsField.selectCurrentTab();
@@ -705,19 +860,18 @@ inputField.focus();
       }
     } else {
       screen.title = 'wschatclient';
-      chatField.setContent('');
+      chats[room.target].setContent('');
       onlineField.clearItems();
       roomsField.clearItems();
       room = null
     };
 
-    history[roomobj.target] = [];
     screen.render()
   };
 
-  chat.onRoomCreated = function(ntarget) {
+  chat.onRoomCreated = function(target) {
     chat.joinRoom({
-      target: ntarget,
+      target: target,
       autoLogin: true,
       loadHistory: true
     })
@@ -726,33 +880,43 @@ inputField.focus();
   chat.onMessage = function(room, msgobj) {
     let target = msgobj.target;
 
+    soundNotify();
+    if (settings.popupnotifier && !isFocused && room.getMyMemberNick() != '' && msgobj.message.indexOf('@' + room.getMyMemberNick()) != -1) {
+      notifier.notify({
+        'title': `wschatclient - ${msgobj.target}`,
+        'subtitle': `Сообщение от ${msgobj.from_login}:`,
+        'message': msgobj.message.substr(0, 80) + (msgobj.message.length > 80 ? '...' : ''),
+        'timeout': 5
+      })
+    };
+
     let userColor = chalk.hex(hexifyColor(msgobj.color)).bold;
-    let message = msgobj.message.replace(/https?:\/\/[^\s"']+/g, chalk.hex('#9797FF')('$&'));
+    let message = processMessage(msgobj.message);
 
     if (msgobj.style == messagestyle.message && msgobj.to == 0) {
-      hlog(target, (userColor(msgobj.from_login, ': ') + message).replace(' :', ':'))
+      rlog(target, (userColor(msgobj.from_login, ': ') + message).replace(' :', ':'))
     };
 
     if (msgobj.style == messagestyle.me) {
-      hlog(target, gray('* ') + userColor(msgobj.from_login, '') + white(message))
+      rlog(target, gray('* ') + userColor(msgobj.from_login, '') + white(message))
     };
 
     if (msgobj.style == messagestyle.event) {
-      hlog(target, gray('* ') + white(message))
+      rlog(target, gray('* ') + white(message))
     };
 
     if (msgobj.style == messagestyle.offtop) {
-      hlog(target, (userColor(msgobj.from_login, ': ') + chalk.hex('#808080')('((', message, '))')).replace(' :', ':'))
+      rlog(target, (userColor(msgobj.from_login, ': ') + chalk.hex('#808080')('((', msgobj.message.replace(/https?:\/\/[^\s"']+/g, chalk.hex('#9797FF')('$&')), '))')).replace(' :', ':'))
     };
 
     if (msgobj.to != 0) {
       if (msgobj.from_login != room.getMyMemberNick()) {
-        lastPMSender = msgobj.from
+        lastPMFrom = msgobj.from
       };
 
       let toUserColor = chalk.hex(hexifyColor(room.getMemberById(msgobj.to).color)).bold;
 
-      hlog(target, (gray('(лс) ') + userColor(msgobj.from_login) + gray(' > ') + toUserColor(room.getMemberById(msgobj.to).name, ': ') + white(message)).replace(' :', ':'))
+      rlog(target, (gray('(лс) ') + userColor(msgobj.from_login) + gray(' > ') + toUserColor(room.getMemberById(msgobj.to).name, ': ') + white(message)).replace(' :', ':'))
     };
 
     screen.render()
@@ -760,56 +924,65 @@ inputField.focus();
 
   chat.onUserStatusChanged = function(room, userobj) {
     let target = userobj.target;
+    switch(userobj.status) {
+      case userstatus.nick_change:
+        soundNotify();
+        rlog(target, userobj.girl ? skyblue(userobj.data) + gold(' сменила никнейм на ') + skyblue(userobj.name) : skyblue(userobj.data) + gold(' сменил никнейм на ') + skyblue(userobj.name))
+      break;
 
-    if (userobj.name != '') {
-      if (userobj.status == userstatus.nick_change) {
-        let content = userobj.girl ? skyblue(userobj.data) + gold(' сменила никнейм на ') + skyblue(userobj.name) : skyblue(userobj.data) + gold(' сменил никнейм на ') + skyblue(userobj.name)
-        hlog(target, content)
-      };
+      case userstatus.gender_change:
+        soundNotify();
+        if (room.getMyMemberNick() == '') {
+          rlog(target, gold('Вы сменили пол на ' + skyblue(userobj.girl ? 'женский' : 'мужской')))
+        } else {
+          rlog(target, skyblue(userobj.name) + userobj.girl ? gold(' сменил пол на ') + skyblue('женский') : gold(' сменила пол на ') + skyblue('мужской'))
+        }
+      break;
 
-      if (userobj.status == userstatus.gender_change) {
-        let content = userobj.girl ? skyblue(userobj.name) + gold(' сменил пол на ') + skyblue('женский') : skyblue(userobj.name) + gold(' сменила пол на ') + skyblue('мужской')
-        hlog(target, content)
-      };
+      case userstatus.color_change:
+        soundNotify();
+        if (room.getMyMemberNick() == '') {
+          rlog(target, gold('Вы сменили ' + chalk.hex(userobj.color).bold('цвет')))
+        } else {
+          rlog(target, skyblue(userobj.name) + userobj.girl ? gold(' сменила ') + chalk.hex(userobj.color).bold('цвет') : gold(' сменил ') + chalk.hex(userobj.color).bold('цвет'))
+        }
+      break;
 
-      if (userobj.status == userstatus.color_change) {
-        let content = userobj.girl ? skyblue(userobj.name) + gold(' сменила ') + chalk.hex(userobj.color).bold('цвет') : skyblue(userobj.name) + gold(' сменил ') + chalk.hex(userobj.color).bold('цвет')
-        hlog(target, content)
-      };
-
-      if (userobj.status == userstatus.typing || userobj.status == userstatus.stop_typing) {
+      case userstatus.typing:
+      case userstatus.stop_typing:
         updateTypingList()
-      };
+    };
 
-      updateOnlineList()
-    }
+    updateOnlineList()
   };
 
   chat.onUserConnected = function(room, userobj) {
-    let content = userobj.girl ? skyblue(userobj.name) + gold(' подключилась к комнате') : skyblue(userobj.name) + gold(' подключился к комнате');
-    hlog(userobj.target, content);
+    soundNotify();
+    rlog(userobj.target, userobj.girl ? skyblue(userobj.name) + gold(' подключилась к комнате') : skyblue(userobj.name) + gold(' подключился к комнате'));
     updateOnlineList()
   };
 
   chat.onUserDisconnected = function(room, userobj) {
-    let content = userobj.girl ? skyblue(userobj.name) + gold(' отключилась от комнаты') : skyblue(userobj.name) + gold(' отключился от комнаты');
-    hlog(userobj.target, content);
+    soundNotify();
+    rlog(userobj.target, userobj.girl ? skyblue(userobj.name) + gold(' отключилась от комнаты') : skyblue(userobj.name) + gold(' отключился от комнаты'));
     updateOnlineList()
   };
 
-  chat.onSysMessage = function(roomobj, msg) {
-    hlog(room.target, gold(msg));
+  chat.onSysMessage = function(room, message) {
+    rlog(room.target, gold(message));
     screen.render()
   };
 
-  screen.on('focus', () => {
-    if (isOpened) {
-      chat.changeStatus(userstatus.back)
-    }
-  });
+screen.on('focus', () => {
+  if (isOpened) {
+    isFocused = true;
+    chat.changeStatus(userstatus.back)
+  }
+});
 
-  screen.on('blur', () => {
-    if (isOpened) {
-      chat.changeStatus(userstatus.away)
-    }
-  })
+screen.on('blur', () => {
+  if (isOpened) {
+    isFocused = false;
+    chat.changeStatus(userstatus.away)
+  }
+})

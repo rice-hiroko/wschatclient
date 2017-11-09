@@ -1,8 +1,8 @@
 {
   "name": "wschatclient",
-  "version": "0.2.0",
+  "version": "2.0.0",
   "author": "helix",
-  "description": "Клиент чата в терминале.",
+  "description": "Клиент чата https://sinair.ru/chat в терминале",
   "main": "chat.js",
   "license": "ISC",
   "repository": {
@@ -13,8 +13,9 @@
     "start": "node chat.js"
   },
   "dependencies": {
-    "blessed": "^0.1.81",
+    "blessed": "git+https://github.com/hypersad/blessed.git",
     "chalk": "^2.1.0",
+    "node-notifier": "^5.1.2",
     "wschatapi": "git+https://github.com/iassasin/wschatapi.git"
   }
 }
