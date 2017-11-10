@@ -26,8 +26,9 @@ let settings = {
 let isOpened = false;
 let isAuthorized = false;
 let isFocused = false;
+let isHooked = false;
 let room = null;
-let chats = {};
+let rooms = {};
 let lastPMFrom = 0;
 let myMessages = [];
 let selectedMessage = myMessages.length;
@@ -163,7 +164,7 @@ process.on('SIGWINCH', () => {
     border: {
       type: 'line'
     }
-  })
+  });
 
   const helpBox = blessed.box({
     parent: window,
@@ -280,8 +281,8 @@ helpBox.append(blessed.box({
   height: 1,
   bottom: 0,
   align: 'center',
-  content: gold('wschatclient@2.0.0 with <3 by helix')
-}))
+  content: gold('wschatclient@2.1.1 with <3 by helix')
+}));
 
 screen.append(window);
 
@@ -354,18 +355,13 @@ inputField.focus();
   inputField.key('enter', () => {
     setTyping(false);
 
-    let input = inputField.getValue().replace('\n', '');
+    let input = inputField.getValue().slice(0, -1);
     if (room != null && input != '') {
       if (input == '/clear') {
-        chats[room.target].setContent('');
+        rooms[room.target].history.setContent('');
         rlog(room.target, gold('Ваш чат был очищен.'));
         screen.render()
-      }
-
-      if (input == '/help') {
-        rlog(room.target,
-        skyblue(''))
-      }
+      };
 
       if (input.startsWith('/re')) {
         if (input == '/re' || input == '/re ') {
@@ -380,7 +376,7 @@ inputField.focus();
         }
       }
 
-      else if (!input.startsWith('/re ') && input != '/clear' && roomsField.ritems.length > 0) {
+      else if (!input.startsWith('/re ') && input != '/clear') {
         room.sendMessage(input)
       };
 
@@ -396,6 +392,15 @@ inputField.focus();
       screen.render()
     }
   });
+
+  inputField.key('backspace', () => {
+    if (isHooked) {
+      isHooked = false;
+      let input = inputField.getValue();
+      inputField.setValue(input.slice(0, -(input.substr(input.lastIndexOf('@') + 1).length)));
+      screen.render()
+    }
+  })
 
   inputField.key('up', () => {
     if (selectedMessage > 0) {
@@ -420,24 +425,39 @@ inputField.focus();
 
   inputField.key(['C-up'], () => {
     if (room != null) {
-      chats[room.target].scroll(-1);
+      rooms[room.target].history.scroll(-1);
       screen.render()
     }
   });
 
   inputField.key(['C-down'], () => {
     if (room != null) {
-      chats[room.target].scroll(1);
+      rooms[room.target].history.scroll(1);
       screen.render()
     }
   });
 
-  inputField.key('backspace', () => {
-    let input = inputField.getValue().replace('\n', '');
-    if (input == '') {
-      setTyping(false)
-    }
-  });
+  inputField.key('tab', () => {
+    inputField.setValue(inputField.getValue().slice(0, -1));
+
+    let input = inputField.getValue();
+    if (room != null && input.lastIndexOf('@') != -1) {
+      let match = (rooms[room.target].users).filter(name => {
+        return name.startsWith(input.substring(input.lastIndexOf('@') + 1))
+      });
+
+      if (match.length == 1) {
+        isHooked = true;
+        inputField.setValue(input.replace(input.substr(input.lastIndexOf('@')), '@' + match[0]))
+      }
+
+      else if (match.length > 1) {
+        rlog(room.target, chalk.hex('#808080')(match.join(', ')))
+      }
+    };
+
+    screen.render()
+  })
 
   inputField.on('keypress', (ch, key) => {
     if (key.full != 'escape'    && key.full != 'tab'    &&
@@ -449,7 +469,11 @@ inputField.focus();
         key.full != 'up'        && key.full != 'left'   &&
         !key.ctrl) {
           setTyping(true)
-        }
+    };
+
+    if (key.full != 'backspace') {
+      isHooked = false
+    }
   });
 
   settingsField.key(['C-c', 'escape', 'C-s'], () => {
@@ -472,14 +496,14 @@ inputField.focus();
     if (settingsField.selected == 0) {
       settings.soundnotifier = settings.soundnotifier ? false : true;
       settingsField.items[0].content = 'Звуковые уведомления при сообщении:     ' + (settings.soundnotifier ? 'вкл.' : 'выкл.');
-      screen.render()
     };
 
     if (settingsField.selected == 1) {
       settings.popupnotifier = settings.popupnotifier ? false : true;
       settingsField.items[1].content = 'Графические уведомления при упоминании: ' + (settings.popupnotifier ? 'вкл.' : 'выкл.');
-      screen.render()
-    }
+    };
+
+    screen.render()
   });
 
   dialogInputField.key('escape', () => {
@@ -493,8 +517,8 @@ inputField.focus();
   });
 
   dialogInputField.key('enter', () => {
-    let _input = dialogInputField.getValue().replace('\n', '');
-    let input = _input.startsWith('#') ? _input : '#' + _input;
+    let input = dialogInputField.getValue().slice(0, -1);
+    input = input.startsWith('#') ? input : '#' + input;
 
     if (input == '#') {
       callDialogBox(0)
@@ -567,7 +591,11 @@ inputField.focus();
  */
 
   function rlog(rname, text) {
-    chats[rname].pushLine(text)
+    if (rooms[rname] != null) {
+      rooms[rname].history.pushLine(text)
+    } else {
+      console.log('rlog fallback: ' + text)
+    }
   };
 
   function callDialogBox(type) {
@@ -669,7 +697,7 @@ inputField.focus();
 
   function roomChanged() {
     screen.title = `wschatclient - ${room.target}`;
-    chats[room.target].show();
+    rooms[room.target].history.show();
     updateOnlineList();
     updateTypingList();
 
@@ -682,7 +710,7 @@ inputField.focus();
     for (let i in chat.rooms) {
       roomsField.addItem(chat.rooms[i].target, () => {
         if (room != null) {
-          chats[room.target].hide();
+          rooms[room.target].history.hide();
         };
 
         room = chat.rooms[i];
@@ -711,6 +739,11 @@ inputField.focus();
     };
 
     screen.render()
+  };
+
+  function updateUsersList(target) {
+    rooms[target].users = rooms[target].users || [];
+    rooms[target].users = room.getMembers().map(user => user.name);
   };
 
   function updateTypingList() {
@@ -774,7 +807,7 @@ inputField.focus();
   };
 
   function soundNotify() {
-    if (settings.soundnotifier && !isFocused) {
+    if (settings.soundnotifier && !isFocused && room.getMyMemberNick() != '') {
       process.stdout.write('\x07')
     }
   };
@@ -822,7 +855,7 @@ inputField.focus();
     };
 
     chat.joinRoom({
-      target: '#chat',
+      target: '#test',
       autoLogin: true,
       loadHistory: true
     });
@@ -831,25 +864,29 @@ inputField.focus();
   };
 
   chat.onJoinedRoom = function(roomobj) {
-    chats[roomobj.target] = chats[roomobj.target] || blessed.log({
-      parent: chatBox,
-      height: '100%-3',
-      mouse: true,
-      style: {
-        fg: 'white'
-      }
-    });
+    rooms[roomobj.target] = rooms[roomobj.target] || {};
+    if (rooms[roomobj.target].history == null) {
+      rooms[roomobj.target].history = blessed.log({
+        parent: chatBox,
+        height: '100%-3',
+        mouse: true,
+        style: {
+          fg: 'white'
+        }
+      })
+    }
 
     if (room != null) {
-      chats[room.target].hide()
+      rooms[room.target].history.hide()
     };
 
     room = roomobj;
-    updateRoomsList()
+    updateRoomsList();
+    updateUsersList(room.target);
   };
 
   chat.onLeaveRoom = function(roomobj) {
-    chats[room.target].setContent('');
+    rooms[room.target].history.setContent('');
     if (roomsField.ritems.length > 1) {
       if (roomsField.ritems.indexOf(room.getTarget()) == 0) {
         roomsField.selectCurrentTab();
@@ -860,7 +897,7 @@ inputField.focus();
       }
     } else {
       screen.title = 'wschatclient';
-      chats[room.target].setContent('');
+      rooms[room.target].history.setContent('');
       onlineField.clearItems();
       roomsField.clearItems();
       room = null
@@ -875,7 +912,7 @@ inputField.focus();
       autoLogin: true,
       loadHistory: true
     })
-  }
+  };
 
   chat.onMessage = function(room, msgobj) {
     let target = msgobj.target;
@@ -883,9 +920,8 @@ inputField.focus();
     soundNotify();
     if (settings.popupnotifier && !isFocused && room.getMyMemberNick() != '' && msgobj.message.indexOf('@' + room.getMyMemberNick()) != -1) {
       notifier.notify({
-        'title': `wschatclient - ${msgobj.target}`,
-        'subtitle': `Сообщение от ${msgobj.from_login}:`,
-        'message': msgobj.message.substr(0, 80) + (msgobj.message.length > 80 ? '...' : ''),
+        'title': `[${msgobj.target}] ${msgobj.from_login}`,
+        'message': msgobj.message.substr(0, 64) + (msgobj.message.length > 64 ? '...' : ''),
         'timeout': 5
       })
     };
@@ -927,7 +963,8 @@ inputField.focus();
     switch(userobj.status) {
       case userstatus.nick_change:
         soundNotify();
-        rlog(target, userobj.girl ? skyblue(userobj.data) + gold(' сменила никнейм на ') + skyblue(userobj.name) : skyblue(userobj.data) + gold(' сменил никнейм на ') + skyblue(userobj.name))
+        rlog(target, userobj.girl ? skyblue(userobj.data) + gold(' сменила никнейм на ') + skyblue(userobj.name) : skyblue(userobj.data) + gold(' сменил никнейм на ') + skyblue(userobj.name));
+        updateUsersList(userobj.target)
       break;
 
       case userstatus.gender_change:
@@ -935,7 +972,7 @@ inputField.focus();
         if (room.getMyMemberNick() == '') {
           rlog(target, gold('Вы сменили пол на ' + skyblue(userobj.girl ? 'женский' : 'мужской')))
         } else {
-          rlog(target, skyblue(userobj.name) + userobj.girl ? gold(' сменил пол на ') + skyblue('женский') : gold(' сменила пол на ') + skyblue('мужской'))
+          rlog(target, skyblue(userobj.name) + (userobj.girl ? gold(' сменил пол на ') + skyblue('женский') : gold(' сменила пол на ') + skyblue('мужской')))
         }
       break;
 
@@ -944,7 +981,7 @@ inputField.focus();
         if (room.getMyMemberNick() == '') {
           rlog(target, gold('Вы сменили ' + chalk.hex(userobj.color).bold('цвет')))
         } else {
-          rlog(target, skyblue(userobj.name) + userobj.girl ? gold(' сменила ') + chalk.hex(userobj.color).bold('цвет') : gold(' сменил ') + chalk.hex(userobj.color).bold('цвет'))
+          rlog(target, skyblue(userobj.name) + (userobj.girl ? gold(' сменила ') + chalk.hex(userobj.color).bold('цвет') : gold(' сменил ') + chalk.hex(userobj.color).bold('цвет')))
         }
       break;
 
@@ -959,13 +996,15 @@ inputField.focus();
   chat.onUserConnected = function(room, userobj) {
     soundNotify();
     rlog(userobj.target, userobj.girl ? skyblue(userobj.name) + gold(' подключилась к комнате') : skyblue(userobj.name) + gold(' подключился к комнате'));
-    updateOnlineList()
+    updateOnlineList();
+    updateUsersList(userobj.target)
   };
 
   chat.onUserDisconnected = function(room, userobj) {
     soundNotify();
     rlog(userobj.target, userobj.girl ? skyblue(userobj.name) + gold(' отключилась от комнаты') : skyblue(userobj.name) + gold(' отключился от комнаты'));
-    updateOnlineList()
+    updateOnlineList();
+    updateUsersList(userobj.target);
   };
 
   chat.onSysMessage = function(room, message) {
