@@ -1,6 +1,6 @@
 {
   "name": "wschatclient",
-  "version": "2.0.0",
+  "version": "2.1.3",
   "author": "helix",
   "description": "Клиент чата https://sinair.ru/chat в терминале",
   "main": "chat.js",
