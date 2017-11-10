@@ -855,7 +855,7 @@ inputField.focus();
     };
 
     chat.joinRoom({
-      target: '#test',
+      target: '#chat',
       autoLogin: true,
       loadHistory: true
     });
