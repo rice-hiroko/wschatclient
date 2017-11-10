@@ -281,7 +281,7 @@ helpBox.append(blessed.box({
   height: 1,
   bottom: 0,
   align: 'center',
-  content: gold('wschatclient@2.1.1 with <3 by helix')
+  content: gold('wschatclient@2.1.3 with <3 by helix')
 }));
 
 screen.append(window);
