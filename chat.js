@@ -32,6 +32,9 @@ let rooms = {};
 let lastPMFrom = 0;
 let myMessages = [];
 let selectedMessage = myMessages.length;
+let pattern;
+let patternMatches = [];
+let selectedMatch = 0;
 
 let timerTyping = new Timer(() => {
   setTyping(false)
@@ -281,7 +284,7 @@ helpBox.append(blessed.box({
   height: 1,
   bottom: 0,
   align: 'center',
-  content: gold('wschatclient@2.1.3 with <3 by helix')
+  content: gold('wschatclient@2.1.4 with <3 by helix')
 }));
 
 screen.append(window);
@@ -397,10 +400,11 @@ inputField.focus();
     if (isHooked) {
       isHooked = false;
       let input = inputField.getValue();
-      inputField.setValue(input.slice(0, -(input.substr(input.lastIndexOf('@') + 1).length)));
+      inputField.setValue(input.substring(0, input.lastIndexOf('@') + 1));
+      selectedMatch = 0;
       screen.render()
     }
-  })
+  });
 
   inputField.key('up', () => {
     if (selectedMessage > 0) {
@@ -439,20 +443,24 @@ inputField.focus();
 
   inputField.key('tab', () => {
     inputField.setValue(inputField.getValue().slice(0, -1));
-
     let input = inputField.getValue();
+    let mentionPatternRegexp = new RegExp(input.substr(input.lastIndexOf('@')) + '$');
     if (room != null && input.lastIndexOf('@') != -1) {
-      let match = (rooms[room.target].users).filter(name => {
-        return name.startsWith(input.substring(input.lastIndexOf('@') + 1))
+      if (!isHooked) {
+        pattern = input.substr(input.lastIndexOf('@') + 1)
+      };
+
+      patternMatches = (rooms[room.target].users).filter(name => {
+        return name.startsWith(pattern)
       });
 
-      if (match.length == 1) {
+      if (patternMatches.length > 0) {
         isHooked = true;
-        inputField.setValue(input.replace(input.substr(input.lastIndexOf('@')), '@' + match[0]))
-      }
-
-      else if (match.length > 1) {
-        rlog(room.target, chalk.hex('#808080')(match.join(', ')))
+        inputField.setValue(input.replace(mentionPatternRegexp, '@' + patternMatches[selectedMatch]));
+        selectedMatch++;
+        if (selectedMatch == patternMatches.length) {
+          selectedMatch = 0
+        }
       }
     };
 
@@ -471,8 +479,9 @@ inputField.focus();
           setTyping(true)
     };
 
-    if (key.full != 'backspace') {
-      isHooked = false
+    if (key.full != 'backspace' && key.full != 'tab') {
+      isHooked = false;
+      selectedMessage = 0
     }
   });
 
@@ -728,13 +737,12 @@ inputField.focus();
       let user = room.getMembers()[i];
 
       let userColor = chalk.hex(hexifyColor(user.color)).bold;
-
       if (user.status == userstatus.online) {
-        onlineField.insertItem(0, (gold('* ') + userColor(user.name)))
+        onlineField.add(gold('* ') + userColor(user.name))
       }
 
       else if (user.status == userstatus.away) {
-        onlineField.insertItem(0, (gray('* ') + userColor(user.name)))
+        onlineField.add(gray('* ') + userColor(user.name))
       }
     };
 
@@ -744,18 +752,12 @@ inputField.focus();
   function updateUsersList(target) {
     rooms[target].users = rooms[target].users || [];
     rooms[target].users = room.getMembers().map(user => user.name);
+    selectedMatch = 0
   };
 
   function updateTypingList() {
     var typingUsers = [];
-
-    for (let i in room.getMembers()) {
-      let user = room.getMembers()[i];
-
-      if (user.typing && user.name != room.getMyMemberNick()) {
-        typingUsers.push(user)
-      }
-    };
+    var typingUsers = room.getMembers().filter((userobj) => { return userobj.typing && userobj.name != room.getMyMemberNick() });
 
     typingUsers.length > 0 ? typingField.setContent(gray(typingUsers[0].name) + gray(typingUsers.length < 2 ? ' печатает...' : ' и другие печатают...')) : typingField.setContent('')
   };
@@ -823,13 +825,13 @@ inputField.focus();
           isAuthorized = true
         } else {
           if (userinfo.code == errorcode.access_denied) {
-            warningBox.setContent(red('Ошибка при авторизации:\nПревышено количество попыток авторизации, попробуйте позже.'));
+            warningBox.setContent(red('Ошибка при авторизации:\nПревышено количество попыток авторизации, попробуйте позже.'))
           }
 
           else if (userinfo.code == errorcode.incorrect_loginpass) {
-            warningBox.setContent(red('Ошибка при авторизации:\nНеверный логин и/или пароль.'));
+            warningBox.setContent(red('Ошибка при авторизации:\nНеверный логин и/или пароль.'))
           } else {
-            warningBox.setContent(red(`Ошибка при авторизации:\nНеизвестная ошибка (${userinfo.code}).`));
+            warningBox.setContent(red(`Ошибка при авторизации:\nНеизвестная ошибка (${userinfo.code}).`))
           };
 
           inputField.cancel();
@@ -882,7 +884,7 @@ inputField.focus();
 
     room = roomobj;
     updateRoomsList();
-    updateUsersList(room.target);
+    updateUsersList(room.target)
   };
 
   chat.onLeaveRoom = function(roomobj) {
@@ -917,7 +919,6 @@ inputField.focus();
   chat.onMessage = function(room, msgobj) {
     let target = msgobj.target;
 
-    soundNotify();
     if (settings.popupnotifier && !isFocused && room.getMyMemberNick() != '' && msgobj.message.indexOf('@' + room.getMyMemberNick()) != -1) {
       notifier.notify({
         'title': `[${msgobj.target}] ${msgobj.from_login}`,
@@ -930,19 +931,20 @@ inputField.focus();
     let message = processMessage(msgobj.message);
 
     if (msgobj.style == messagestyle.message && msgobj.to == 0) {
-      rlog(target, (userColor(msgobj.from_login, ': ') + message).replace(' :', ':'))
+      rlog(target, userColor(msgobj.from_login + ': ') + message)
     };
 
     if (msgobj.style == messagestyle.me) {
-      rlog(target, gray('* ') + userColor(msgobj.from_login, '') + white(message))
+      rlog(target, gray('* ') + userColor(msgobj.from_login, '') + message)
     };
 
     if (msgobj.style == messagestyle.event) {
-      rlog(target, gray('* ') + white(message))
+      rlog(target, gray('* ') + message)
     };
 
     if (msgobj.style == messagestyle.offtop) {
-      rlog(target, (userColor(msgobj.from_login, ': ') + chalk.hex('#808080')('((', msgobj.message.replace(/https?:\/\/[^\s"']+/g, chalk.hex('#9797FF')('$&')), '))')).replace(' :', ':'))
+      let message = msgobj.message.replace(/https?:\/\/[^\s"']+/g, chalk.hex('#9797FF')('$&'));
+      rlog(target, userColor(msgobj.from_login + ': ') + chalk.hex('#808080')('((', message, '))'))
     };
 
     if (msgobj.to != 0) {
@@ -951,8 +953,7 @@ inputField.focus();
       };
 
       let toUserColor = chalk.hex(hexifyColor(room.getMemberById(msgobj.to).color)).bold;
-
-      rlog(target, (gray('(лс) ') + userColor(msgobj.from_login) + gray(' > ') + toUserColor(room.getMemberById(msgobj.to).name, ': ') + white(message)).replace(' :', ':'))
+      rlog(target, gray('(лс) ') + userColor(msgobj.from_login) + gray(' > ') + toUserColor(room.getMemberById(msgobj.to).name + ': ') + message)
     };
 
     screen.render()
@@ -962,13 +963,11 @@ inputField.focus();
     let target = userobj.target;
     switch(userobj.status) {
       case userstatus.nick_change:
-        soundNotify();
-        rlog(target, userobj.girl ? skyblue(userobj.data) + gold(' сменила никнейм на ') + skyblue(userobj.name) : skyblue(userobj.data) + gold(' сменил никнейм на ') + skyblue(userobj.name));
+        rlog(target, skyblue(userobj.data) + gold(userobj.girl ? ' сменила никнейм на ' : ' сменил никнейм на ') + skyblue(userobj.name));
         updateUsersList(userobj.target)
       break;
 
       case userstatus.gender_change:
-        soundNotify();
         if (room.getMyMemberNick() == '') {
           rlog(target, gold('Вы сменили пол на ' + skyblue(userobj.girl ? 'женский' : 'мужской')))
         } else {
@@ -977,11 +976,10 @@ inputField.focus();
       break;
 
       case userstatus.color_change:
-        soundNotify();
         if (room.getMyMemberNick() == '') {
           rlog(target, gold('Вы сменили ' + chalk.hex(userobj.color).bold('цвет')))
         } else {
-          rlog(target, skyblue(userobj.name) + (userobj.girl ? gold(' сменила ') + chalk.hex(userobj.color).bold('цвет') : gold(' сменил ') + chalk.hex(userobj.color).bold('цвет')))
+          rlog(target, skyblue(userobj.name) + gold(userobj.girl ? ' сменила ' : ' сменил ') + chalk.hex(userobj.color).bold('цвет'))
         }
       break;
 
@@ -994,17 +992,15 @@ inputField.focus();
   };
 
   chat.onUserConnected = function(room, userobj) {
-    soundNotify();
-    rlog(userobj.target, userobj.girl ? skyblue(userobj.name) + gold(' подключилась к комнате') : skyblue(userobj.name) + gold(' подключился к комнате'));
+    rlog(userobj.target, skyblue(userobj.name) + gold(userobj.girl ? ' подключилась к комнате' : ' подключился к комнате'));
     updateOnlineList();
     updateUsersList(userobj.target)
   };
 
   chat.onUserDisconnected = function(room, userobj) {
-    soundNotify();
-    rlog(userobj.target, userobj.girl ? skyblue(userobj.name) + gold(' отключилась от комнаты') : skyblue(userobj.name) + gold(' отключился от комнаты'));
+    rlog(userobj.target, skyblue(userobj.name) + gold(userobj.girl ? ' отключилась от комнаты' : ' отключился от комнаты'));
     updateOnlineList();
-    updateUsersList(userobj.target);
+    updateUsersList(userobj.target)
   };
 
   chat.onSysMessage = function(room, message) {
