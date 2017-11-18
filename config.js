@@ -3,9 +3,9 @@ module.exports = {
     Adress: 'wss://sinair.ru/ws/chat'
   },
   Authorization: {
-    Login:    'а',
-    Password: 'а',
-    APIKey:   'а'
+    Login:    '',
+    Password: '',
+    APIKey:   ''
   },
   Settings: {
     SoundNotifier:           false,
