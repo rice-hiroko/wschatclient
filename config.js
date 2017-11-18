@@ -1,11 +1,15 @@
 module.exports = {
+  Core: {
+    Adress: 'wss://sinair.ru/ws/chat'
+  },
   Authorization: {
-    Login:    '',
-    Password: '',
-    APIKey:   ''
+    Login:    'а',
+    Password: 'а',
+    APIKey:   'а'
   },
   Settings: {
-    SoundNotifier: false,
-    PopupNotifier: false
+    SoundNotifier:           false,
+    PopupNotifier:           false,
+    PopupNotifierOnEveryone: false
   }
 }

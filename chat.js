@@ -7,7 +7,7 @@ const notifier = require('node-notifier');
 const config = require('./config');
 const Timer = require('./lib/timer');
 
-const chat = new wschat('wss://sinair.ru/ws/chat');
+const chat = new wschat(config.Core.Adress);
 
 chat.open();
 
@@ -16,11 +16,9 @@ const messagestyle = wschat.MessageStyle;
 const userstatus = wschat.UserStatus;
 
 let settings = {
-  login: config.Authorization.Login,
-  password: config.Authorization.Password,
-  apikey: config.Authorization.APIKey,
-  popupnotifier: config.Settings.PopupNotifier,
-  soundnotifier: config.Settings.SoundNotifier
+  soundNotifier: config.Settings.SoundNotifier,
+  popupNotifier: config.Settings.PopupNotifier,
+  popupNotifierOnEveryone: config.Settings.PopupNotifierOnEveryone
 };
 
 let isOpened = false;
@@ -159,8 +157,8 @@ process.on('SIGWINCH', () => {
   const settingsBox = blessed.box({
     parent: window,
     label: 'Настройки',
-    width: 49,
-    height: 6,
+    width: 59,
+    height: 7,
     top: 'center',
     left: 'center',
     padding: 1,
@@ -239,8 +237,9 @@ process.on('SIGWINCH', () => {
   const settingsField = blessed.list({
     parent: settingsBox,
     items: [
-      'Звуковые уведомления при сообщении:     ' + (settings.soundnotifier ? 'вкл.' : 'выкл.'), // 0
-      'Графические уведомления при упоминании: ' + (settings.popupnotifier ? 'вкл.' : 'выкл.')  // 1
+      'Звуковые уведомления при сообщении:               ' + (settings.soundNotifier ? 'вкл.' : 'выкл.'),          // 0
+      'Графические уведомления при упоминании:           ' + (settings.popupNotifier ? 'вкл.' : 'выкл.'),          // 1
+      'Графические уведомления при упоминании @everyone: ' + (settings.popupNotifierOnEveryone ? 'вкл.' : 'выкл.') // 2
     ],
     style: {
       selected: {
@@ -284,7 +283,7 @@ helpBox.append(blessed.box({
   height: 1,
   bottom: 0,
   align: 'center',
-  content: gold('wschatclient@2.1.4 with <3 by helix')
+  content: gold('wschatclient@2.3.6 with <3 by helix')
 }));
 
 screen.append(window);
@@ -491,25 +490,30 @@ inputField.focus();
     screen.render()
   });
 
-  settingsField.key(['down'], () => {
+  settingsField.key('down', () => {
     settingsField.down(1);
     screen.render()
   });
 
-  settingsField.key(['up'], () => {
+  settingsField.key('up', () => {
     settingsField.up(1);
     screen.render()
   });
 
   settingsField.key('enter', () => {
     if (settingsField.selected == 0) {
-      settings.soundnotifier = settings.soundnotifier ? false : true;
-      settingsField.items[0].content = 'Звуковые уведомления при сообщении:     ' + (settings.soundnotifier ? 'вкл.' : 'выкл.');
+      settings.soundNotifier = settings.soundNotifier ? false : true;
+      settingsField.items[0].content = 'Звуковые уведомления при сообщении:               ' + (settings.soundNotifier ? 'вкл.' : 'выкл.')
     };
 
     if (settingsField.selected == 1) {
-      settings.popupnotifier = settings.popupnotifier ? false : true;
-      settingsField.items[1].content = 'Графические уведомления при упоминании: ' + (settings.popupnotifier ? 'вкл.' : 'выкл.');
+      settings.popupNotifier = settings.popupNotifier ? false : true;
+      settingsField.items[1].content = 'Графические уведомления при упоминании:           ' + (settings.popupNotifier ? 'вкл.' : 'выкл.')
+    };
+
+    if (settingsField.selected == 2) {
+      settings.popupNotifierOnEveryone = settings.popupNotifierOnEveryone ? false : true;
+      settingsField.items[2].content = 'Графические уведомления при упоминании @everyone: ' + (settings.popupNotifierOnEveryone ? 'вкл.' : 'выкл.')
     };
 
     screen.render()
@@ -601,7 +605,10 @@ inputField.focus();
 
   function rlog(rname, text) {
     if (rooms[rname] != null) {
-      rooms[rname].history.pushLine(text)
+      rooms[rname].history.pushLine(text);
+      if (settings.soundNotifier && !isFocused && rname == room.target && room.getMyMemberNick() != '') {
+        process.stdout.write('\x07')
+      }
     } else {
       console.log('rlog fallback: ' + text)
     }
@@ -808,19 +815,13 @@ inputField.focus();
     }
   };
 
-  function soundNotify() {
-    if (settings.soundnotifier && !isFocused && room.getMyMemberNick() != '') {
-      process.stdout.write('\x07')
-    }
-  };
-
 /**
  * Обработка событий в чате
  */
 
   chat.onOpen = function() {
-    if (settings.login != '' && settings.password != '' && !isAuthorized) {
-      chat.authByLoginAndPassword(settings.login, settings.password, (success, userinfo) => {
+    if (config.Authorization.Login != '' && config.Authorization.Password != '' && !isAuthorized) {
+      chat.authByLoginAndPassword(config.Authorization.Login, config.Authorization.Password, (success, userinfo) => {
         if (success) {
           isAuthorized = true
         } else {
@@ -842,8 +843,8 @@ inputField.focus();
       })
     };
 
-    if (settings.apikey != '' && !isAuthorized) {
-      chat.authByApiKey(settings.apikey, (success, userinfo) => {
+    if (config.Authorization.APIKey != '' && !isAuthorized) {
+      chat.authByApiKey(config.Authorization.APIKey, (success, userinfo) => {
         if (userinfo.user_id != 0) {
           isAuthorized = true
         } else {
@@ -919,12 +920,19 @@ inputField.focus();
   chat.onMessage = function(room, msgobj) {
     let target = msgobj.target;
 
-    if (settings.popupnotifier && !isFocused && room.getMyMemberNick() != '' && msgobj.message.indexOf('@' + room.getMyMemberNick()) != -1) {
-      notifier.notify({
-        'title': `[${msgobj.target}] ${msgobj.from_login}`,
-        'message': msgobj.message.substr(0, 64) + (msgobj.message.length > 64 ? '...' : ''),
-        'timeout': 5
-      })
+    if (settings.popupNotifier  && room.getMyMemberNick() != '') {
+      if (msgobj.message.indexOf('@' + room.getMyMemberNick()) != -1 || (settings.popupNotifierOnEveryone && msgobj.message.indexOf('@everyone') != -1)) {
+        notifier.notify({
+          'title': `[${msgobj.target}] ${msgobj.from_login}`,
+          'message': msgobj.message.substr(0, 64) + (msgobj.message.length > 64 ? '...' : ''),
+          'timeout': 5
+        });
+
+        if(settingsBox.visible) {
+          rlog(room.target, 'refocus catch');
+          settingsField.focus();
+        }
+      }
     };
 
     let userColor = chalk.hex(hexifyColor(msgobj.color)).bold;
@@ -1008,16 +1016,39 @@ inputField.focus();
     screen.render()
   };
 
-screen.on('focus', () => {
-  if (isOpened) {
-    isFocused = true;
-    chat.changeStatus(userstatus.back)
-  }
-});
+/**
+ * Обработка событий в клиенте
+ */
 
-screen.on('blur', () => {
-  if (isOpened) {
-    isFocused = false;
-    chat.changeStatus(userstatus.away)
-  }
-})
+  screen.on('focus', () => {
+    if (isOpened) {
+      isFocused = true;
+      chat.changeStatus(userstatus.back)
+    }
+  });
+
+  screen.on('blur', () => {
+    if (isOpened) {
+      isFocused = false;
+      chat.changeStatus(userstatus.away)
+    }
+  });
+
+  /* XXX: иногда, при открытом и сфокусированном боксе, во время рефокуса
+   * на окне терминала, фокус с бокса пропадает, соответственно, привязанные
+   * к нему горячие клавиши перестают работать и дальнейшее пользование
+   * клиентом становится невозможно. Поля для ввода при потере фокуса автоматически
+   * восстанавливают его, поэтому они не нуждаются в аналогичных методах.
+   */
+
+    settingsField.on('blur', () => {
+      if (settingsBox.visible) {
+        settingsField.focus()
+      }
+    });
+
+    warningBox.on('blur', () => {
+      if (warningBox.visible) {
+        warningBox.focus()
+      }
+    })
